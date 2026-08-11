@@ -92,8 +92,8 @@ export const SYSTEM_ORGAOS: SystemOrganInfo[] = [
   },
   {
     id: "servicos_centrais",
-    name: "Serviços Centrais",
-    shortName: "Serviços Centrais",
+    name: "Unidade Orgânica",
+    shortName: "Unidade Orgânica",
     description: "Recursos humanos, processos individuais, assiduidade, dados financeiros, orçamentos, fornecedores, economato, património e arquivo",
     iconName: "Briefcase",
     badgeColor: "bg-emerald-100 text-emerald-800 border-emerald-300",

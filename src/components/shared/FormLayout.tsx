@@ -38,6 +38,7 @@ export const FormLayout: React.FC<FormLayoutProps> = ({
   iconColor = "text-amber-400",
   maxWidth = "max-w-4xl",
   hidePrintHeader = false,
+  user,
 }) => {
   return (
     <div className="relative">
@@ -87,10 +88,12 @@ export const FormLayout: React.FC<FormLayoutProps> = ({
         {!hidePrintHeader && (
           <div className="hidden print:block mb-6">
             <InstitutionalHeader 
-              direcaoName="DIRECÇÃO GERAL"
-              sectorName={title}
+              unidadeName={user?.unidadeOrganica || "UNIDADE ORGÂNICA"}
+              direcaoName={user?.direcao || "DIRECÇÃO GERAL"}
+              departamentoName={user?.departamento}
+              reparticaoName={user?.reparticao}
+              sectorName={user?.setor || title}
               year={new Date().getFullYear()}
-              unidadeName="SERVIÇOS CENTRAIS"
               title={title}
             />
           </div>

@@ -266,12 +266,56 @@ export interface FinancialData {
 
 export interface Supplier {
   id: string;
-  nome: string;
-  tipoServico: string;
-  validadeContrato: string;
-  dataRegisto: string;
+  nome: string; // Razão Social / Nome
+  tipoServico: string; // Categoria Principal / Serviço
+  validadeContrato?: string;
+  dataRegisto?: string;
   contacto: string;
   email: string;
+
+  // 1. Identificação da Empresa
+  razaoSocial?: string;
+  nomeFantasia?: string;
+  nif?: string;
+  dataConstituicao?: string;
+  tipoEmpresa?: "Individual" | "Sociedade" | "Outro" | string;
+
+  // 2. Endereço e Contatos
+  enderecoCompleto?: string;
+  cidadeProvincia?: string;
+  pais?: string;
+  telefone?: string;
+  website?: string;
+
+  // 3. Representante Legal
+  repNomeCompleto?: string;
+  repCargo?: string;
+  repTelefone?: string;
+  repEmail?: string;
+
+  // 4. Dados Bancários
+  banco?: string;
+  agencia?: string;
+  numeroConta?: string;
+  ibanSwift?: string;
+
+  // 5. Áreas de Atuação
+  produtosServicosOferecidos?: string;
+  categoriaPrincipal?: string;
+  certificacoesAutorizacoes?: string;
+
+  // 6. Documentação Anexa (Checklist)
+  docCertidaoRegistoComercial?: boolean;
+  docNifFiscal?: boolean;
+  docEstatutosEmpresa?: boolean;
+  docCertificadoContaBancaria?: boolean;
+  docLicencasEspecificas?: boolean;
+  docOutros?: string;
+
+  // 7. Declaração
+  declaracaoAceite?: boolean;
+  localDataDeclaracao?: string;
+  assinaturaRepresentante?: string;
 }
 
 export interface Bem {

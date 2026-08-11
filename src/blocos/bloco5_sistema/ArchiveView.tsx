@@ -931,10 +931,12 @@ export default function ArchiveView({
                       {/* Cabeçalho Oficial Padronizado */}
                       <div className="w-full">
                         <InstitutionalHeader 
-                          direcaoName="ISPS"
-                          sectorName=""
+                          unidadeName={user?.unidadeOrganica || "UNIDADE ORGÂNICA"}
+                          direcaoName={user?.direcao || "ISPS"}
+                          departamentoName={user?.departamento}
+                          reparticaoName={user?.reparticao}
+                          sectorName={user?.setor}
                           year={viewingDoc.year}
-                          unidadeName="SERVIÇOS CENTRAIS"
                           title={viewingDoc.title}
                         />
                       </div>

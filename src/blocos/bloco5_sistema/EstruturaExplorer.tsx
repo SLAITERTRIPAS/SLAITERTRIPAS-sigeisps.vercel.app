@@ -32,6 +32,7 @@ export const EstruturaExplorer = () => {
             {
               title: "Unidade Gestora e Executora de Aquisições",
               reparticoes: [
+                "Gestão de Produtos e Preços",
                 "Gestão de Fornecedores",
                 "Plano de Aquisição",
                 "Plano de Contratação",
@@ -143,7 +144,7 @@ export const EstruturaExplorer = () => {
       ],
     },
     {
-      title: "Serviços Centrais",
+      title: "Unidade Orgânica",
       type: "Unidade Estrutural",
       direcoes: [
         {

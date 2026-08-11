@@ -8,8 +8,12 @@
 export interface PrintDocumentOptions {
   title: string;
   subtitle?: string;
+  orgao?: string;
   direcao?: string;
+  divisao?: string;
   departamento?: string;
+  reparticao?: string;
+  setor?: string;
   headerHtml?: string;
   contentHtml: string;
   styles?: string;
@@ -135,8 +139,12 @@ export function openPrintDocumentWindow(options: PrintDocumentOptions) {
   const {
     title,
     subtitle,
-    direcao = "DIRECÇÃO GERAL",
+    orgao,
+    direcao,
+    divisao,
     departamento,
+    reparticao,
+    setor,
     headerHtml,
     contentHtml,
     styles = "",
@@ -170,6 +178,28 @@ export function openPrintDocumentWindow(options: PrintDocumentOptions) {
     contentHtml.includes("Instituto Superior Politécnico") ||
     contentHtml.includes("lh3.googleusercontent.com/d/11zvvpOpZARM1yk_irEDpjJ-qBKlTlhad");
 
+  const resolvedOrgao = (() => {
+    if (orgao && orgao.trim() && orgao.toUpperCase() !== "UNIDADE ORGÂNICA") {
+      const u = orgao.toUpperCase();
+      if (u.includes("SERVIÇO") || u.includes("SERVICO")) return "SERVIÇOS CENTRAIS";
+      if (u.includes("DIREÇÃO E GESTÃO") || u.includes("DIRECAO E GESTAO")) return "ÓRGÃO DE DIREÇÃO E GESTÃO";
+      return u;
+    }
+    if (direcao) {
+      const d = direcao.toUpperCase();
+      if (d.includes("DICOSAFA") || d.includes("DICOSSER") || d.includes("SERVIÇO")) return "SERVIÇOS CENTRAIS";
+      if (d.includes("GABINETE") || d.includes("DIRETOR-GERAL") || d.includes("CONSELHO") || d.includes("GDG")) return "ÓRGÃO DE DIREÇÃO E GESTÃO";
+      if (d.includes("ENGENHARIA") || d.includes("CIE") || d.includes("CENTRO") || d.includes("INCUBACAO")) return "UNIDADE ORGÂNICA";
+    }
+    return (orgao || "UNIDADE ORGÂNICA").toUpperCase();
+  })();
+
+  const lowestLevelName = [setor, reparticao, departamento, divisao, direcao].filter(Boolean)[0] || resolvedOrgao;
+  let resolvedTitle = (title || "PLANO DE ATIVIDADE").toUpperCase().trim();
+  if (resolvedTitle === "PLANO DE ATIVIDADE" || resolvedTitle === "PLANO DE ATIVIDADES") {
+    resolvedTitle = `PLANO DE ATIVIDADE DE ${lowestLevelName.toUpperCase()}`;
+  }
+
   const defaultHeader =
     headerHtml !== undefined
       ? headerHtml
@@ -180,27 +210,26 @@ export function openPrintDocumentWindow(options: PrintDocumentOptions) {
       <div style="margin-bottom: 15px;">
         <img src="https://lh3.googleusercontent.com/d/11zvvpOpZARM1yk_irEDpjJ-qBKlTlhad" alt="Logo ISPS" style="height: 100px; object-fit: contain;" />
       </div>
-      <h2 style="font-size: 22px; font-weight: 900; text-transform: uppercase; margin: 5px 0; color: #0f172a; letter-spacing: -0.5px;">
+      <h2 style="font-size: 20px; font-weight: 900; text-transform: uppercase; margin: 4px 0; color: #0f172a; letter-spacing: -0.5px;">
         INSTITUTO SUPERIOR POLITÉCNICO DE SONGO
       </h2>
-      <h3 style="font-size: 14px; font-weight: bold; text-transform: uppercase; margin: 2px 0; color: #334155; letter-spacing: 1px;">
+      <h3 style="font-size: 13px; font-weight: bold; text-transform: uppercase; margin: 2px 0; color: #334155; letter-spacing: 1px;">
         PROVÍNCIA DE TETE
       </h3>
-      <h3 style="font-size: 14px; font-weight: bold; text-transform: uppercase; margin: 2px 0; color: #334155; letter-spacing: 1px;">
+      <h3 style="font-size: 13px; font-weight: bold; text-transform: uppercase; margin: 2px 0; color: #334155; letter-spacing: 1px;">
         DISTRITO DE CAHORA-BASSA
       </h3>
       
-      <div style="margin-top: 15px; border-top: 1px solid #e2e8f0; padding-top: 10px;">
-        <h4 style="font-size: 14px; font-weight: 900; text-transform: uppercase; margin: 2px 0; color: #1e293b;">
-          SERVIÇOS CENTRAIS
-        </h4>
-        <h4 style="font-size: 14px; font-weight: bold; text-transform: uppercase; margin: 2px 0; color: #1e3a8a;">
-          ${direcao}
-        </h4>
+      <div style="margin-top: 12px; border-top: 1px solid #e2e8f0; padding-top: 8px;">
+        ${resolvedOrgao ? `<h4 style="font-size: 14px; font-weight: 900; text-transform: uppercase; margin: 2px 0; color: #0f172a;">${resolvedOrgao}</h4>` : ""}
+        ${direcao ? `<h4 style="font-size: 14px; font-weight: bold; text-transform: uppercase; margin: 2px 0; color: #1e3a8a;">${direcao}</h4>` : ""}
+        ${divisao ? `<h4 style="font-size: 13px; font-weight: bold; text-transform: uppercase; margin: 2px 0; color: #1e3a8a;">${divisao}</h4>` : ""}
+        ${departamento ? `<h4 style="font-size: 13px; font-weight: bold; text-transform: uppercase; margin: 2px 0; color: #1e3a8a;">${departamento}</h4>` : ""}
+        ${reparticao || setor ? `<h4 style="font-size: 13px; font-weight: bold; text-transform: uppercase; margin: 2px 0; color: #1e3a8a;">${[reparticao, setor].filter(Boolean).join(" - ")}</h4>` : ""}
       </div>
 
       <h5 style="font-size: 18px; font-weight: 900; text-transform: uppercase; margin: 20px auto 0; color: #0f172a; border-top: 3px solid #0f172a; border-bottom: 3px solid #0f172a; padding: 10px 0; width: 90%;">
-        ${departamento ? `PLANO DE ATIVIDADE DO ${departamento}` : title}
+        ${resolvedTitle}
       </h5>
       ${subtitle ? `<p style="font-size: 12px; margin: 8px 0 0 0; color: #64748b; font-style: italic;">${subtitle}</p>` : ""}
     </div>

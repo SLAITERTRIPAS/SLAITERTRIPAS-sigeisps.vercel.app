@@ -1227,32 +1227,10 @@ export default function MatrixView({
             </div>
             <div>
               <h3 className="text-xl font-bold">
-                {title === "Plano Setorial"
-                  ? "Submeter Plano Setorial"
-                  : title === "Plano do Departamento" ||
-                      title === "Plano do Gabinete"
-                    ? `Submeter ${title}`
-                    : title === "Plano da Direção"
-                      ? "Submeter Plano da Direção"
-                      : title === "Plano Institucional"
-                        ? "Consolidar Plano Institucional"
-                        : isDepartment
-                          ? "Submeter Plano"
-                          : "Consolidar Matriz Estratégica"}
+                SUBMETER O PLANO DE ATIVIDADE
               </h3>
               <p className="text-blue-200 text-sm">
-                {title === "Plano Setorial"
-                  ? "Ao submeter, o plano será enviado para validação do Departamento."
-                  : title === "Plano do Departamento" ||
-                      title === "Plano do Gabinete"
-                    ? "Ao submeter, o plano será enviado para validação da Direção."
-                    : title === "Plano da Direção"
-                      ? "Ao submeter, o plano será enviado para a Repartição de Planificação."
-                      : title === "Plano Institucional"
-                        ? "Ao consolidar, o plano institucional será finalizado."
-                        : isDepartment
-                          ? "Ao submeter, o plano será enviado para validação."
-                          : 'Ao consolidar, a matriz será alocada em "Minha Matriz" para posterior partilha.'}
+                O plano será submetido para validação do seu superior hierárquico imediato (Direção ou Departamento correspondente).
               </p>
             </div>
           </div>
@@ -1276,50 +1254,13 @@ export default function MatrixView({
                 if (onFinalSubmit) {
                   onFinalSubmit(sortedActivities);
                 } else {
-                  let message = "";
-                  if (title === "Plano Setorial") {
-                    message =
-                      "Plano Setorial submetido ao Departamento com sucesso!";
-                  } else if (
-                    title === "Plano do Departamento" ||
-                    title === "Plano do Gabinete"
-                  ) {
-                    message = `${title} submetido à Direção com sucesso!`;
-                  } else if (title === "Plano da Direção") {
-                    message =
-                      "Plano da Direção submetido ao Plano Institucional com sucesso!";
-                  } else if (title === "Plano Institucional") {
-                    message = "Plano Institucional consolidado com sucesso!";
-                  } else if (
-                    title === "Plano Individual" ||
-                    title === "Meu Plano Individual"
-                  ) {
-                    message = "Actividades guardadas no seu Plano Individual!";
-                  } else {
-                    message = isDepartment
-                      ? "Plano submetido com sucesso!"
-                      : "Matriz consolidada com sucesso!";
-                  }
+                  let message = "Plano de Atividade submetido com sucesso!";
                   alert(message);
                 }
               }}
               className="bg-white text-blue-900 px-10 py-4 rounded-xl font-bold hover:bg-blue-50 transition-all whitespace-nowrap"
             >
-              {title === "Plano Setorial"
-                ? "Submeter ao departamento"
-                : title === "Plano do Departamento" ||
-                    title === "Plano do Gabinete"
-                  ? "Submeter à direção"
-                  : title === "Plano da Direção"
-                    ? "Submeter ao plano institucional"
-                    : title === "Plano Institucional"
-                      ? "Consolidar plano institucional"
-                      : title === "Plano Individual" ||
-                          title === "Meu Plano Individual"
-                        ? "Guardar no meu plano individual"
-                        : isDepartment
-                          ? `Submeter plano`
-                          : `Publicar matriz ${nextYear}`}
+              SUBMETER O PLANO DE ATIVIDADE
             </button>
           </div>
         </div>

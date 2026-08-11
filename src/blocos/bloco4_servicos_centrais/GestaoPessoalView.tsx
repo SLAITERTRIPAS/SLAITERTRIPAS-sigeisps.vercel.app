@@ -211,6 +211,8 @@ export default function GestaoPessoalView({
     chefiaCTA?: boolean;
     foraISPS?: boolean;
     estadoForaISPS?: string;
+    direcao?: string | null;
+    departamento?: string | null;
   } | null>(null);
   const [selectedColaborador, setSelectedColaborador] =
     useState<Types.Colaborador | null>(null);
@@ -1128,12 +1130,23 @@ export default function GestaoPessoalView({
       const matchesEstadoForaISPS = filtro.estadoForaISPS
         ? c.estado === filtro.estadoForaISPS
         : true;
+
+      const matchesDir = filtro.direcao
+        ? (c.direcao || "").toLowerCase().includes(filtro.direcao.toLowerCase()) ||
+          (c.unidade || "").toLowerCase().includes(filtro.direcao.toLowerCase())
+        : true;
+      const matchesDept = filtro.departamento
+        ? (c.departamento || "").toLowerCase().includes(filtro.departamento.toLowerCase())
+        : true;
+
       return (
         matchesSearch &&
         matchesTipo &&
         matchesEfetivo &&
         matchesForaISPS &&
-        matchesEstadoForaISPS
+        matchesEstadoForaISPS &&
+        matchesDir &&
+        matchesDept
       );
     })
     .sort((a, b) => {
@@ -2697,7 +2710,7 @@ export default function GestaoPessoalView({
                   ["unidade", "unidade organica", "setor", "departamento"],
                   tipoVal === "Docente"
                     ? "Unidade orgânica"
-                    : "Serviços Centrais",
+                    : "Unidade Orgânica",
                 );
                 const cargoVal = getExcelRowValue(
                   row,
@@ -2836,7 +2849,7 @@ export default function GestaoPessoalView({
       tipoRelacaoContractual: "Quadro",
       tipoContrato: "Por Tempo Indeterminado",
       efetivo: true,
-      unidade: "Serviços Centrais",
+      unidade: "Unidade Orgânica",
       cargo: "Técnico",
     };
     const isCtaNaoQuadro: Types.Colaborador = {
@@ -2855,7 +2868,7 @@ export default function GestaoPessoalView({
       tipoRelacaoContractual: "Fora do Quadro",
       tipoContrato: "A Prazo Certo",
       efetivo: false,
-      unidade: "Serviços Centrais",
+      unidade: "Unidade Orgânica",
       cargo: "Técnico",
     };
 

@@ -1,8 +1,8 @@
 export const UNIDADES_ORGANICAS_SISTEMA = [
   {
     id: "odg",
-    nome: "Órgãos de Direção e Gestão",
-    descricao: "Órgãos de Direção e Gestão",
+    nome: "Órgão de Direção e Gestão",
+    descricao: "Órgão de Direção e Gestão",
     direcoes: [
       "Conselho de Representantes",
       "Gabinete do Diretor-Geral",
@@ -32,11 +32,12 @@ export const UNIDADES_CENTRAIS =
   UNIDADES_ORGANICAS_SISTEMA.find((u) => u.id === "odg")?.direcoes || [];
 export const UNIDADES_ORGANICAS =
   UNIDADES_ORGANICAS_SISTEMA.find((u) => u.id === "uo")?.direcoes || [];
-export const SERVICOS_CENTRAIS =
+export const UNIDADES_ORGANICAS_SERVICOS =
   UNIDADES_ORGANICAS_SISTEMA.find((u) => u.id === "sc")?.direcoes || [];
 
 export const DEPARTAMENTOS: Record<string, string[]> = {
   "Gabinete do Diretor-Geral": [
+    "Gabinete do Diretor-Geral",
     "Chefe do GDG",
     "Secretaria Executiva",
     "Departamento de Planificação Estudos e Projetos",
@@ -46,6 +47,7 @@ export const DEPARTAMENTOS: Record<string, string[]> = {
     "Departamento Jurídico",
   ],
   GDG: [
+    "Gabinete do Diretor-Geral",
     "Chefe do GDG",
     "Secretaria Executiva",
     "Departamento de Planificação Estudos e Projetos",
@@ -55,6 +57,7 @@ export const DEPARTAMENTOS: Record<string, string[]> = {
     "Departamento Jurídico",
   ],
   DG: [
+    "Gabinete do Diretor-Geral",
     "Chefe do GDG",
     "Secretaria Executiva",
     "Departamento de Planificação Estudos e Projetos",

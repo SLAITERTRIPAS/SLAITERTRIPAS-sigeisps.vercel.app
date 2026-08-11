@@ -60,7 +60,7 @@ export const intelligentDiagnostics = {
 
         activities.forEach((act: any) => {
           const title = act.nomeAtividade || act.designacao || act.title || "";
-          const dir = act.direcao || act.unidadeOrganica || "Geral / Serviços Centrais";
+          const dir = act.direcao || act.unidadeOrganica || "Geral / Unidade Orgânica";
           const dept = act.departamento || "Geral";
           const key = `${normalize(title)}|${normalize(dir)}|${normalize(dept)}`;
           if (!seen.has(key)) seen.set(key, []);
@@ -80,7 +80,7 @@ export const intelligentDiagnostics = {
             const first = items[0];
             duplicateGroups.push({
               title: first.nomeAtividade || first.designacao || first.title || "Atividade Sem Nome",
-              direcao: first.direcao || first.unidadeOrganica || "Geral / Serviços Centrais",
+              direcao: first.direcao || first.unidadeOrganica || "Geral / Unidade Orgânica",
               departamento: first.departamento || "Geral",
               items,
             });
@@ -360,7 +360,7 @@ export const intelligentDiagnostics = {
           const u = docSnap.data();
           if (!u.direcao && !u.unidadeOrganica && !u.departamento) {
             batch.update(doc(db, "colaboradores", docSnap.id), {
-              direcao: "Serviços Centrais",
+              direcao: "Unidade Orgânica",
               departamento: "Geral",
               updatedAt: serverTimestamp(),
             });

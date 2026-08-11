@@ -161,7 +161,7 @@ export async function getUnifiedProducts(): Promise<UnifiedProduct[]> {
   const map = new Map<string, UnifiedProduct>();
   const deletedKeys = getDeletedProductKeys();
 
-  // 1. Fetch EXCLUSIVELY from Firestore (Gestão de Produtos e Preços)
+  // 1. Fetch from Firestore (Gestão de Produtos e Preços)
   try {
     const remoteProducts = await firestoreService.produtosUnificados.get();
     remoteProducts.forEach((p) => {
@@ -172,6 +172,7 @@ export async function getUnifiedProducts(): Promise<UnifiedProduct[]> {
             const rubrica = p.rubrica || "Bens - 121";
             const necessidade = p.necessidade || "Geral";
             map.set(key, {
+              id: p.id,
               nome: singularName,
               preco: Number(p.preco) || 0,
               unidade: p.unidade || "Unidade",
@@ -187,6 +188,26 @@ export async function getUnifiedProducts(): Promise<UnifiedProduct[]> {
   } catch (e) {
     console.error("Error fetching unified products from Firestore:", e);
   }
+
+  // 2. Include baseline products from PRODUTOS_POR_NECESSIDADE if not already in Firestore or deleted
+  Object.entries(PRODUTOS_POR_NECESSIDADE).forEach(([necessidade, prods]) => {
+    const rubrica = getRubricaForNecessidade(necessidade);
+    prods.forEach((p) => {
+      const singularName = toSingularProductName(p.nome);
+      const key = singularName.trim().toLowerCase();
+      if (!deletedKeys.has(key) && !map.has(key)) {
+        map.set(key, {
+          nome: singularName,
+          preco: p.preco || 0,
+          unidade: p.unidade || "Unidade",
+          especificacao: p.especificacao || "",
+          rubrica: rubrica,
+          necessidade: necessidade,
+          categoria: getCategoryForRubricaOrNecessidade(rubrica, necessidade),
+        });
+      }
+    });
+  });
 
   const result = Array.from(map.values());
   result.sort((a, b) => a.nome.localeCompare(b.nome, "pt-MZ", { sensitivity: "base" }));
@@ -295,11 +316,14 @@ export async function deduplicateDatabaseProducts(): Promise<{ totalUnique: numb
   }
 }
 
-export async function saveUnifiedProduct(product: { nome: string; preco: number; unidade: string; especificacao: string; rubrica?: string; necessity?: string; necessidade?: string; categoria?: string }) {
+export async function saveUnifiedProduct(product: { nome: string; preco: number; unidade: string; especificacao: string; rubrica?: string; necessity?: string; necessidade?: string; categoria?: string; originalNome?: string }) {
   try {
     const current = await getUnifiedProducts();
     const singularName = toSingularProductName(product.nome);
     const key = singularName.trim().toLowerCase();
+    const oldKey = product.originalNome
+      ? toSingularProductName(product.originalNome).trim().toLowerCase()
+      : key;
 
     // If previously deleted, remove from deleted list
     const deletedKeys = getDeletedProductKeys();
@@ -307,8 +331,16 @@ export async function saveUnifiedProduct(product: { nome: string; preco: number;
       deletedKeys.delete(key);
       localStorage.setItem("sigep_deleted_products", safeJSONStringify(Array.from(deletedKeys)));
     }
+    if (oldKey !== key && deletedKeys.has(oldKey)) {
+      deletedKeys.delete(oldKey);
+      localStorage.setItem("sigep_deleted_products", safeJSONStringify(Array.from(deletedKeys)));
+    }
 
-    const index = current.findIndex((p) => toSingularProductName(p.nome).trim().toLowerCase() === key);
+    const index = current.findIndex(
+      (p) =>
+        toSingularProductName(p.nome).trim().toLowerCase() === key ||
+        toSingularProductName(p.nome).trim().toLowerCase() === oldKey
+    );
     const existing = index >= 0 ? current[index] : null;
 
     const rubrica = product.rubrica || existing?.rubrica || "Bens - 121";
@@ -338,33 +370,45 @@ export async function saveUnifiedProduct(product: { nome: string; preco: number;
     const docId = `prod_${key}`.replace(/[^a-zA-Z0-9_]/g, "_");
     await firestoreService.produtosUnificados.set(docId, updatedProduct);
 
-    // Tarefa 3: Sincronizar preços em planos já planificados (não aprovados/submetidos definitivamente)
-    // Buscamos todas as atividades que não estão em estado terminal e atualizamos as rubricas que usam este produto
+    // Sincronização global de preços e nomes em TODOS os planos de atividades (incluindo submetidos)
     try {
       const allActs = await firestoreService.actividades.get();
-      const updatableStatuses = ["draft", "departamento", "direcao", "contabilidade", "plano", "planificado", "Planificado", "Plano", "Aguardando", "Por Validar"];
       
       for (const act of allActs) {
         if (!act.id) continue;
-        const currentStatus = act.status || "draft";
-        
-        // Se a atividade está num status que permite atualização e tem rubricas
-        if (updatableStatuses.includes(currentStatus) && Array.isArray(act.rubricas)) {
+        if (Array.isArray(act.rubricas)) {
           let actChanged = false;
           const newRubricas = act.rubricas.map((r: any) => {
             const rProdName = toSingularProductName(r.nomeProduto || "").toLowerCase();
-            if (rProdName === key) {
+            const matchesKey =
+              rProdName === key ||
+              rProdName === oldKey ||
+              (oldKey && oldKey.length > 2 && rProdName.includes(oldKey)) ||
+              (key && key.length > 2 && rProdName.includes(key));
+
+            if (matchesKey) {
               const newPreco = Number(updatedProduct.preco) || 0;
               const newUnidade = updatedProduct.unidade || r.detalhes;
               const newSpec = updatedProduct.especificacao || r.especificacao;
-              
-              if (r.precoUnitario !== newPreco || r.detalhes !== newUnidade || r.especificacao !== newSpec) {
+              const newNome = updatedProduct.nome;
+
+              if (
+                r.precoUnitario !== newPreco ||
+                r.detalhes !== newUnidade ||
+                r.especificacao !== newSpec ||
+                r.nomeProduto !== newNome
+              ) {
                 actChanged = true;
-                const updatedR = { ...r, precoUnitario: newPreco, detalhes: newUnidade, especificacao: newSpec };
-                // Recalcular valor total da rubrica
-                if (updatedR.quantidade) {
-                  updatedR.valorTotal = updatedR.quantidade * newPreco;
-                }
+                const qtd = Number(r.quantidade) || 1;
+                const updatedR = {
+                  ...r,
+                  nomeProduto: newNome,
+                  precoUnitario: newPreco,
+                  detalhes: newUnidade,
+                  especificacao: newSpec,
+                  quantidade: qtd,
+                  valorTotal: qtd * newPreco,
+                };
                 return updatedR;
               }
             }
@@ -372,8 +416,18 @@ export async function saveUnifiedProduct(product: { nome: string; preco: number;
           });
 
           if (actChanged) {
+            const newTotalRubricas = newRubricas.reduce(
+              (sum: number, r: any) => sum + (Number(r.valorTotal) || 0),
+              0
+            );
+            const totalGasoleo = Number(act.valorTotalGasoleo) || 0;
+            const newOrcamentoTotal = newTotalRubricas + totalGasoleo;
+
             await firestoreService.actividades.update(act.id, { 
               rubricas: newRubricas,
+              valorTotal: newOrcamentoTotal > 0 ? newOrcamentoTotal : act.valorTotal,
+              orcamentoTotal: newOrcamentoTotal > 0 ? newOrcamentoTotal : act.orcamentoTotal,
+              valor: newOrcamentoTotal > 0 ? newOrcamentoTotal : act.valor,
               updatedAt: new Date().toISOString(),
               syncSource: "product_price_update"
             });
@@ -389,18 +443,35 @@ export async function saveUnifiedProduct(product: { nome: string; preco: number;
           let draftChanged = false;
           const newDraftRubricas = d.rubricas.map((r: any) => {
             const rProdName = toSingularProductName(r.nomeProduto || "").toLowerCase();
-            if (rProdName === key) {
+            const matchesKey =
+              rProdName === key ||
+              rProdName === oldKey ||
+              (oldKey && oldKey.length > 2 && rProdName.includes(oldKey)) ||
+              (key && key.length > 2 && rProdName.includes(key));
+
+            if (matchesKey) {
               const newPreco = Number(updatedProduct.preco) || 0;
               const newUnidade = updatedProduct.unidade || r.detalhes;
               const newSpec = updatedProduct.especificacao || r.especificacao;
-              
-              if (r.precoUnitario !== newPreco || r.detalhes !== newUnidade || r.especificacao !== newSpec) {
+              const newNome = updatedProduct.nome;
+
+              if (
+                r.precoUnitario !== newPreco ||
+                r.detalhes !== newUnidade ||
+                r.especificacao !== newSpec ||
+                r.nomeProduto !== newNome
+              ) {
                 draftChanged = true;
-                const updatedR = { ...r, precoUnitario: newPreco, detalhes: newUnidade, especificacao: newSpec };
-                if (updatedR.quantidade) {
-                  updatedR.valorTotal = updatedR.quantidade * newPreco;
-                }
-                return updatedR;
+                const qtd = Number(r.quantidade) || 1;
+                return {
+                  ...r,
+                  nomeProduto: newNome,
+                  precoUnitario: newPreco,
+                  detalhes: newUnidade,
+                  especificacao: newSpec,
+                  quantidade: qtd,
+                  valorTotal: qtd * newPreco,
+                };
               }
             }
             return r;

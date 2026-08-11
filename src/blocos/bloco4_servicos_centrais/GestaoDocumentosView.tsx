@@ -220,9 +220,11 @@ export default function GestaoDocumentosView({
       {!hideHeader && (
         <div className="bg-white">
           <InstitutionalHeader
-            unidadeName="SERVIÇOS CENTRAIS"
-            direcaoName="SECRETARIA GERAL"
-            sectorName="GESTÃO DE DOCUMENTOS"
+            unidadeName={user?.unidadeOrganica || "UNIDADE ORGÂNICA"}
+            direcaoName={user?.direcao}
+            departamentoName={user?.departamento}
+            reparticaoName={user?.reparticao}
+            sectorName={user?.setor}
             year={2027}
             title="SISTEMA DE GESTÃO DE EXPEDIENTE"
           />

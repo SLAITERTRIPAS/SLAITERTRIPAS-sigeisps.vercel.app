@@ -2420,10 +2420,12 @@ export default function AcaoOrcamentalView({
           >
             {/* Cabeçalho Institucional Oficial Padronizado */}
             <InstitutionalHeader 
-              direcaoName={selectedUnit !== "todos" ? selectedUnit : "GERAL INSTITUCIONAL"}
-              sectorName=""
+              unidadeName={user?.unidadeOrganica || "UNIDADE ORGÂNICA"}
+              direcaoName={selectedUnit !== "todos" ? selectedUnit : user?.direcao}
+              departamentoName={user?.departamento}
+              reparticaoName={user?.reparticao}
+              sectorName={user?.setor}
               year={new Date().getFullYear()}
-              unidadeName="SERVIÇOS CENTRAIS"
               title="AÇÃO ORÇAMENTAL SISTAFE"
             />
 

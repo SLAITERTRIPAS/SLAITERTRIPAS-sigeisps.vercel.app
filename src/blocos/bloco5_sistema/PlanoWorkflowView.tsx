@@ -337,6 +337,39 @@ export default function PlanoWorkflowView({
     }
   }, [syncYear, isSyncModalOpen]);
 
+  useEffect(() => {
+    if (showTramitacaoModal && workflowToProcess) {
+      const { toStatus, targetActivities } = workflowToProcess;
+      let options: string[] = [];
+
+      const sampleAct = (targetActivities && targetActivities.length > 0)
+        ? targetActivities[0]
+        : (rawActivities && rawActivities.length > 0 ? rawActivities[0] : null);
+
+      if (toStatus === "reparticao") {
+        const rep = user?.reparticao || sampleAct?.reparticao || "Repartição";
+        options = [rep];
+      } else if (toStatus === "departamento") {
+        const dep = user?.departamento || sampleAct?.departamento || "Departamento";
+        options = [dep];
+      } else if (toStatus === "direcao") {
+        const dir = user?.direcao || sampleAct?.direcao || "Direção";
+        options = [dir];
+      } else if (toStatus === "planificacao") {
+        options = ["Setor de Planificação (DPEP)", "Departamento de Planificação Estudos e Projetos (DPEP)"];
+      } else if (toStatus === "dpep_chefe") {
+        options = ["Chefe do DPEP (Departamento de Planificação Estudos e Projetos)"];
+      } else if (toStatus === "institucional" || toStatus === "meritos") {
+        options = ["Conselho de Direção", "Gabinete do Diretor Geral"];
+      }
+      
+      const validOptions = options.filter(o => o && o.trim() !== "");
+      if (validOptions.length > 0) {
+        setSelectedDestinatario(validOptions[0]);
+      }
+    }
+  }, [showTramitacaoModal, workflowToProcess, user, rawActivities]);
+
   const [isLoading, setIsLoading] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
   const [filterDirecao, setFilterDirecao] = useState("");
@@ -1802,7 +1835,7 @@ export default function PlanoWorkflowView({
 
       let allocatedCount = 0;
       for (const act of institucionalActivities) {
-        const allocation = determineSectorAllocation(act, colaboradores);
+        const allocation: any = determineSectorAllocation(act, colaboradores);
         if (allocation) {
           const needsUpdate =
             act.direcao !== allocation.direcao ||
@@ -2456,7 +2489,7 @@ export default function PlanoWorkflowView({
               !finalDepartamento ||
               !finalSetor
             ) {
-              const allocation = determineSectorAllocation(
+              const allocation: any = determineSectorAllocation(
                 {
                   responsavel: respVal,
                   title: titleVal,
@@ -4093,7 +4126,7 @@ export default function PlanoWorkflowView({
                                 <div className="p-1.5 rounded-lg bg-emerald-100 text-emerald-700">
                                   <Plus size={15} strokeWidth={2.5} />
                                 </div>
-                                <span>Novo Plano</span>
+                                <span>Nova Atividade</span>
                               </button>
 
                               <button
@@ -4141,9 +4174,13 @@ export default function PlanoWorkflowView({
                                     handleSendDepartamentoToDirecao();
                                   else if (selectedRoleMode === "Direção")
                                     handleSendDirecaoToPlanificacao();
-                                  else if (selectedRoleMode === "Planificação")
-                                    handleSendPlanificacaoToInstitucional();
-                                  else
+                                  else if (selectedRoleMode === "Planificação") {
+                                    if (isChefeDPEP) {
+                                      handleSendPlanificacaoToInstitucional();
+                                    } else {
+                                      handleSendPlanificacaoToChefeDPEP();
+                                    }
+                                  } else
                                     onShowAlert(
                                       "Ação não configurada para este nível.",
                                     );
@@ -4210,12 +4247,17 @@ export default function PlanoWorkflowView({
                                 handleSendDepartamentoToDirecao();
                               else if (selectedRoleMode === "Direção")
                                 handleSendDirecaoToPlanificacao();
-                              else if (selectedRoleMode === "Planificação")
-                                handleSendPlanificacaoToInstitucional();
+                              else if (selectedRoleMode === "Planificação") {
+                                if (isChefeDPEP) {
+                                  handleSendPlanificacaoToInstitucional();
+                                } else {
+                                  handleSendPlanificacaoToChefeDPEP();
+                                }
+                              }
                             }}
                             className="bg-[#2563eb] hover:bg-[#1d4ed8] text-white font-black tracking-widest text-[9px] uppercase px-5 py-2.5 rounded-xl transition-all flex items-center gap-2 whitespace-nowrap shadow-lg shadow-blue-100 h-[40px]"
                           >
-                            <Send size={14} strokeWidth={3} /> {selectedRoleMode === "Direção" ? "Submeter para Planificação" : "SUBMETER ATIVIDADES"}
+                            <Send size={14} strokeWidth={3} /> SUBMETER O PLANO DE ATIVIDADE
                           </button>
                         </>
                       ) : (
@@ -4279,7 +4321,9 @@ export default function PlanoWorkflowView({
                 <InstitutionalHeader
                   unidadeName={user.unidadeOrganica}
                   direcaoName={user.direcao}
-                  sectorName={user.setor || user.reparticao || user.departamento || user.direcao}
+                  departamentoName={user.departamento}
+                  reparticaoName={user.reparticao}
+                  sectorName={user.setor}
                   year={selectedYear}
                   isOwner={isSuperBossUser(user)}
                 />
@@ -4411,10 +4455,20 @@ export default function PlanoWorkflowView({
                                                   <button
                                                     onClick={() => {
                                                       const currentStatus = activity.status || "draft";
-                                                      const nextStatus = currentStatus === "draft" ? "departamento" :
+                                                      const nextStatus = (currentStatus === "draft" || currentStatus === "setorial") ? "reparticao" :
+                                                                       currentStatus === "reparticao" ? "departamento" :
                                                                        currentStatus === "departamento" ? "direcao" :
-                                                                       currentStatus === "direcao" ? "planificacao" : "institucional";
-                                                      handleWorkflowTransition(currentStatus, nextStatus, currentStatus, nextStatus, [activity]);
+                                                                       currentStatus === "direcao" ? "planificacao" :
+                                                                       currentStatus === "planificacao" ? "dpep_chefe" : "institucional";
+                                                      const originLabel = currentStatus === "reparticao" ? "Repartição" :
+                                                                          currentStatus === "departamento" ? "Departamento" :
+                                                                          currentStatus === "direcao" ? "Direção" :
+                                                                          currentStatus === "planificacao" ? "Setor de Planificação" : "Chefe do DPEP";
+                                                      const destLabel = nextStatus === "departamento" ? "Departamento" :
+                                                                        nextStatus === "direcao" ? "Direção" :
+                                                                        nextStatus === "planificacao" ? "Setor de Planificação" :
+                                                                        nextStatus === "dpep_chefe" ? "Chefe do DPEP" : "Plano Institucional";
+                                                      handleWorkflowTransition(currentStatus, nextStatus, originLabel, destLabel, [activity]);
                                                     }}
                                                     className="p-2 text-emerald-600 hover:bg-emerald-50 rounded-lg transition-colors"
                                                     title="Tramitar / Assinar Documento"
@@ -4481,7 +4535,9 @@ export default function PlanoWorkflowView({
                 <InstitutionalHeader
                   unidadeName={user.unidadeOrganica}
                   direcaoName={user.direcao}
-                  sectorName={user.reparticao || user.departamento || user.direcao}
+                  departamentoName={user.departamento}
+                  reparticaoName={user.reparticao}
+                  sectorName={user.setor}
                   year={selectedYear}
                   isOwner={isSuperBossUser(user)}
                 />
@@ -4610,7 +4666,9 @@ export default function PlanoWorkflowView({
                 <InstitutionalHeader
                   unidadeName={user.unidadeOrganica}
                   direcaoName={user.direcao}
-                  sectorName={user.departamento || user.direcao}
+                  departamentoName={user.departamento}
+                  reparticaoName={user.reparticao}
+                  sectorName={user.setor}
                   year={selectedYear}
                   isOwner={isSuperBossUser(user)}
                 />
@@ -4973,7 +5031,9 @@ export default function PlanoWorkflowView({
                 <InstitutionalHeader
                   unidadeName={user.unidadeOrganica}
                   direcaoName={user.direcao}
-                  sectorName={user.direcao}
+                  departamentoName={user.departamento}
+                  reparticaoName={user.reparticao}
+                  sectorName={user.setor}
                   year={selectedYear}
                   isOwner={isSuperBossUser(user)}
                 />
@@ -5173,10 +5233,10 @@ export default function PlanoWorkflowView({
                             className="bg-white border border-slate-100 rounded-2xl overflow-hidden shadow-sm"
                           >
                           <InstitutionalHeader 
-                            direcaoName={user.direcao}
-                            sectorName={dept} 
-                            year={selectedYear} 
                             unidadeName={user.unidadeOrganica}
+                            direcaoName={user.direcao}
+                            departamentoName={dept}
+                            year={selectedYear} 
                           />
                           <div className="bg-slate-900 text-white p-6 rounded-t-2xl flex flex-col md:flex-row justify-between items-center gap-4">
                             <div>
@@ -5275,10 +5335,10 @@ export default function PlanoWorkflowView({
                           className="bg-white border border-slate-100 rounded-2xl overflow-hidden shadow-sm"
                         >
                           <InstitutionalHeader 
-                            direcaoName={user.direcao} 
-                            sectorName={dept} 
-                            year={selectedYear} 
                             unidadeName={user.unidadeOrganica}
+                            direcaoName={user.direcao} 
+                            departamentoName={dept}
+                            year={selectedYear} 
                           />
                           <div className="bg-slate-900 text-white p-6 rounded-t-2xl flex flex-col md:flex-row justify-between items-center gap-4">
                             <div>
@@ -6960,12 +7020,9 @@ export default function PlanoWorkflowView({
                         <InstitutionalHeader
                           unidadeName={user.unidadeOrganica}
                           direcaoName={user.direcao}
-                          sectorName={
-                            user.setor ||
-                            user.reparticao ||
-                            user.departamento ||
-                            user.direcao
-                          }
+                          departamentoName={user.departamento}
+                          reparticaoName={user.reparticao}
+                          sectorName={user.setor}
                           year={selectedYear}
                           isPlanificacaoHeader={isPlanificacao}
                         />
@@ -8227,11 +8284,11 @@ export default function PlanoWorkflowView({
                           <Send size={20} />
                         </div>
                         <h3 className="text-xl font-black text-slate-900 tracking-tight">
-                          Assinar e Tramitar Documento
+                          Submeter o Plano de Atividade
                         </h3>
                       </div>
                       <p className="text-sm font-bold text-slate-500">
-                        Selecione o gabinete ou setor de destino para o envio oficial.
+                        O plano será submetido automaticamente para o seu superior hierárquico conforme o enquadramento.
                       </p>
                     </div>
 
@@ -8257,9 +8314,24 @@ export default function PlanoWorkflowView({
                           className="w-full px-5 py-4 rounded-2xl border-2 border-slate-100 focus:border-blue-500 focus:ring-0 outline-none text-sm font-bold transition-all bg-slate-50 hover:bg-white"
                         >
                           <option value="">Selecione o Gabinete / Setor</option>
-                          {GABINETES_DESTINATARIOS.map((g) => (
-                            <option key={g} value={g}>{g}</option>
-                          ))}
+                          {(() => {
+                            if (!workflowToProcess) return GABINETES_DESTINATARIOS;
+                            const { toStatus } = workflowToProcess;
+                            
+                            let options: string[] = [];
+                            if (toStatus === "reparticao") options = [user?.reparticao];
+                            else if (toStatus === "departamento") options = [user?.departamento];
+                            else if (toStatus === "direcao") options = [user?.direcao];
+                            else if (toStatus === "planificacao") options = ["Direção de Planificação e Estudos (DPEP)"];
+                            else if (toStatus === "institucional") options = ["Conselho de Direção", "Gabinete do Diretor Geral"];
+                            
+                            const validOptions = options.filter(o => o && o.trim() !== "");
+                            return validOptions.length > 0 ? validOptions.map(g => (
+                              <option key={g} value={g}>{g}</option>
+                            )) : GABINETES_DESTINATARIOS.map(g => (
+                              <option key={g} value={g}>{g}</option>
+                            ));
+                          })()}
                         </select>
                       </div>
 
@@ -8283,7 +8355,7 @@ export default function PlanoWorkflowView({
                             <RefreshCw size={16} strokeWidth={1.5} className="animate-spin" />
                           ) : (
                             <>
-                              <Save size={16} /> Assinar e Enviar
+                              <Save size={16} /> Submeter
                             </>
                           )}
                         </button>

@@ -17,13 +17,14 @@ import {
 } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import { openPrintDocumentWindow } from "../../lib/printUtils";
+import { getUserAllocatedDetails as getSharedUserAllocatedDetails } from "../../lib/allocationUtils";
 import { firestoreService } from "../../lib/firestoreService";
 import { DraftModal } from "../../components/ui/DraftMemoryUI";
 import {
   UNIDADES_ORGANICAS_SISTEMA,
   UNIDADES_CENTRAIS,
   UNIDADES_ORGANICAS,
-  SERVICOS_CENTRAIS,
+  UNIDADES_ORGANICAS_SERVICOS,
   DEPARTAMENTOS,
   REPARTICOES,
   SECTORES,
@@ -87,6 +88,71 @@ const getCleanNecessidadeKey = (nec: string): string => {
   if (codeMatch) return codeMatch[1];
   // Se não tiver código, retorna o nome limpo e minúsculo
   return nec.replace(/^\d+\s*-\s*/, "").trim().toLowerCase();
+};
+
+const getFilteredProductsForRubrica = (
+  productsList: any[],
+  rubricaName?: string,
+  necessidadeName?: string
+) => {
+  if (!productsList || productsList.length === 0) return [];
+
+  const normRub = (rubricaName || "").toLowerCase().trim();
+  const normNec = (necessidadeName || "").toLowerCase().trim();
+
+  // Extrair código numérico de Rubrica (ex: 121, 122, 112, 1434)
+  const rubCode = normRub.match(/\d+/)?.[0];
+  
+  // Extrair nome limpo da Necessidade sem códigos numéricos iniciais
+  const cleanNec = normNec.replace(/^\d+\s*[-_.]?\s*/, "").trim();
+  const necCode = normNec.match(/^(\d+)/)?.[1];
+
+  // Agrupar produtos por nível de correspondência
+  const exactNecMatches: any[] = [];
+  const categoryMatches: any[] = [];
+  const otherMatches: any[] = [];
+
+  productsList.forEach((p: any) => {
+    const pRub = (p.rubrica || "").toLowerCase();
+    const pNec = (p.necessidade || "").toLowerCase();
+    const pCat = (p.categoria || "").toLowerCase();
+    const cleanPNec = pNec.replace(/^\d+\s*[-_.]?\s*/, "").trim();
+    const pNecCode = pNec.match(/^(\d+)/)?.[1];
+    const pRubCode = pRub.match(/\d+/)?.[0] || pCat.match(/\d+/)?.[0];
+
+    // 1. Verificação de correspondência na Necessidade
+    const isNecMatch =
+      (cleanNec && cleanPNec && (cleanPNec === cleanNec || cleanPNec.includes(cleanNec) || cleanNec.includes(cleanPNec))) ||
+      (necCode && pNecCode && necCode === pNecCode);
+
+    if (isNecMatch) {
+      exactNecMatches.push(p);
+      return;
+    }
+
+    // 2. Verificação de correspondência na Categoria / Rubrica
+    const isCatMatch =
+      (rubCode && (pRubCode === rubCode || pCat.includes(rubCode) || pRub.includes(rubCode))) ||
+      (normRub.includes("bens") && (pRub.includes("bens") || pCat.includes("121") || pRub.includes("121"))) ||
+      (normRub.includes("serviços") && (pRub.includes("serviços") || pCat.includes("122") || pRub.includes("122"))) ||
+      (normRub.includes("pessoal") && (pRub.includes("pessoal") || pCat.includes("112") || pRub.includes("112"))) ||
+      (normRub.includes("transferência") && (pRub.includes("transferência") || pCat.includes("1434") || pRub.includes("1434")));
+
+    if (isCatMatch) {
+      categoryMatches.push(p);
+      return;
+    }
+
+    otherMatches.push(p);
+  });
+
+  // Se houver produtos que batem com a necessidade ou categoria, retorne-os
+  if (exactNecMatches.length > 0 || categoryMatches.length > 0) {
+    return [...exactNecMatches, ...categoryMatches];
+  }
+
+  // Fallback seguro: retorne a lista inteira de produtos da base de dados
+  return productsList;
 };
 
 function calculateNextNum(acts: any[], targetSector?: string, currentUserArea?: string): number {
@@ -665,12 +731,18 @@ export default function ActivityForm({
   };
 
   const responsavelOptions = useMemo(() => {
-    const baseList = colaboradores.length > 0 ? colaboradores : FUNCIONARIOS;
+    const baseList = colaboradores.length > 0 ? colaboradores : EFETIVO_GERAL_DATA;
 
     // Filtragem por área selecionada no formulário
     let filteredByArea = baseList.filter((c) => {
       if (!c) return false;
       const cAny = c as any;
+
+      // REGRA: Deve ser Cargo de Chefia (não Nenhum) OU Efetivo Geral (efetivo: true)
+      const isChefia = cAny.cargoChefia && cAny.cargoChefia !== "Nenhum";
+      const isEfetivoGeral = cAny.efetivo === true;
+      
+      if (!isChefia && !isEfetivoGeral) return false;
 
       // Filtragem hierárquica: Prioridade para o nível mais baixo selecionado no formulário
       if (formData.setor) {
@@ -696,6 +768,11 @@ export default function ActivityForm({
       filteredByArea = baseList.filter((c) => {
         if (!c) return false;
         const cAny = c as any;
+        const isChefia = cAny.cargoChefia && cAny.cargoChefia !== "Nenhum";
+        const isEfetivoGeral = cAny.efetivo === true;
+        
+        if (!isChefia && !isEfetivoGeral) return false;
+
         if (formData.unidadeSelecionada)
           return cAny.direcao === formData.unidadeSelecionada;
         return user?.direcao ? cAny.direcao === user.direcao : true;
@@ -713,12 +790,19 @@ export default function ActivityForm({
   ]);
 
   const outrosColaboradoresOptions = useMemo(() => {
-    const baseList = colaboradores.length > 0 ? colaboradores : FUNCIONARIOS;
+    const baseList = colaboradores.length > 0 ? colaboradores : EFETIVO_GERAL_DATA;
 
     // 1. Filtrar pela área selecionada
     const areaList = baseList.filter((c) => {
       if (!c) return false;
       const cAny = c as any;
+
+      // REGRA: Puxar todos da Repartição de Pessoal que são Chefia ou Efetivo Geral
+      const isChefia = cAny.cargoChefia && cAny.cargoChefia !== "Nenhum";
+      const isEfetivoGeral = cAny.efetivo === true;
+      
+      if (!isChefia && !isEfetivoGeral) return false;
+
       if (formData.setor) return (cAny.setor || cAny.sector) === formData.setor;
       if (formData.reparticao) return cAny.reparticao === formData.reparticao;
       if (formData.departamento)
@@ -732,12 +816,14 @@ export default function ActivityForm({
     const headsInArea = areaList.filter((c) => {
       const cAny = c as any;
       const cargoLower = (
+        cAny.cargoChefia ||
         cAny.cargo ||
         cAny.funcao ||
         cAny.categoria ||
         ""
       ).toLowerCase();
       const isChef =
+        (cAny.cargoChefia && cAny.cargoChefia !== "Nenhum") ||
         cargoLower.includes("chefe") ||
         cargoLower.includes("diretor") ||
         cargoLower.includes("responsável") ||
@@ -1633,9 +1719,11 @@ export default function ActivityForm({
   };
 
   const getUserAllocatedDetails = () => {
-    const usr = activeUser;
-    if (!usr) return null;
+    return getSharedUserAllocatedDetails(activeUser, colaboradores);
+  };
 
+  const _legacyGetUserAllocatedDetails = () => {
+    const usr = activeUser || {};
     let matchedColab: any = null;
     const uEmail = (usr.email || "").trim().toLowerCase();
     const uNuit = (usr.nuit || "").trim();
@@ -1686,10 +1774,10 @@ export default function ActivityForm({
       const dirLower = dir.toLowerCase();
       const catLower = cat.toLowerCase();
 
-      let catNormalized = "Serviços Centrais";
+      let catNormalized = "Unidade Orgânica";
 
       if (catLower.includes("orgânica") || catLower.includes("organica")) {
-        catNormalized = "Unidade orgânica";
+        catNormalized = "Unidade Orgânica";
       } else if (
         catLower.includes("direção") ||
         catLower.includes("direcao") ||
@@ -1703,7 +1791,9 @@ export default function ActivityForm({
         catLower.includes("serviço") ||
         catLower.includes("servico") ||
         catLower.includes("central") ||
-        catLower.includes("isps")
+        catLower.includes("isps") ||
+        dirLower.includes("dicosafa") ||
+        dirLower.includes("dicosser")
       ) {
         catNormalized = "Serviços Centrais";
       } else {
@@ -1714,7 +1804,7 @@ export default function ActivityForm({
           dirLower.includes("cie") ||
           dirLower.includes("centro")
         ) {
-          catNormalized = "Unidade orgânica";
+          catNormalized = "Unidade Orgânica";
         } else if (
           dirLower.includes("gabinete") ||
           dirLower.includes("diretor") ||
@@ -1722,12 +1812,12 @@ export default function ActivityForm({
         ) {
           catNormalized = "Órgão de Direção e Gestão";
         } else {
-          catNormalized = "Serviços Centrais";
+          catNormalized = "Unidade Orgânica";
         }
       }
 
       let dirNormalized = dir;
-      if (catNormalized === "Unidade orgânica") {
+      if (catNormalized === "Unidade Orgânica") {
         if (dirLower.includes("engenharia")) {
           dirNormalized = "Divisão de Engenharia";
         } else if (
@@ -1757,19 +1847,16 @@ export default function ActivityForm({
         } else {
           dirNormalized = "Conselho Técnico e de Qualidade";
         }
-      } else {
-        // Serviços Centrais
+      } else if (catNormalized === "Serviços Centrais") {
         if (
-          dirLower.includes("DICOSSER") ||
+          dirLower.includes("dicosser") ||
           dirLower.includes("sociais") ||
           dirLower.includes("estudantis") ||
           dirLower.includes("registo")
         ) {
-          dirNormalized =
-            "Direção de Coordenação de Serviços Académicos, Sociais, Extensão e Relações Públicas (DICOSSER)";
+          dirNormalized = "DICOSSER";
         } else {
-          dirNormalized =
-            "Direção de Coordenação de Serviços de Administração, Finanças e de Apoio (DICOSAFA)";
+          dirNormalized = "DICOSAFA";
         }
       }
 
@@ -1885,7 +1972,7 @@ export default function ActivityForm({
       user.reparticao
     ) {
       return {
-        cat: user.unidade || user.unidadeOrganica || "Serviços Centrais",
+        cat: user.unidade || user.unidadeOrganica || "Unidade Orgânica",
         dir: user.direcao || "",
         dep: user.departamento || "",
         rep: user.reparticao || "",
@@ -2310,7 +2397,7 @@ export default function ActivityForm({
       ) {
         matchedCat = "Unidade orgânica";
       } else {
-        matchedCat = "Serviços Centrais";
+        matchedCat = "Unidade Orgânica";
       }
     }
 
@@ -2334,7 +2421,7 @@ export default function ActivityForm({
     }
 
     return {
-      cat: matchedCat || "Serviços Centrais",
+      cat: matchedCat || "Unidade Orgânica",
       dir: matchedDir,
       dep: matchedDep,
       rep: matchedRep,
@@ -2377,8 +2464,8 @@ export default function ActivityForm({
             ...prev,
             unidadeCentral:
               prev.unidadeCentral ||
-              (allocated.cat === "Serviços Centrais"
-                ? "Serviços Centrais"
+              (allocated.cat === "Unidade Orgânica"
+                ? "Unidade Orgânica"
                 : ""),
             unidadeOrganica: allocated.cat || prev.unidadeOrganica,
             unidadeSelecionada: allocated.dir || prev.unidadeSelecionada,
@@ -2511,7 +2598,7 @@ export default function ActivityForm({
           ...prev,
           unidadeCentral:
             prev.unidadeCentral ||
-            (matchedCat === "Serviços Centrais" ? "Serviços Centrais" : ""),
+            (matchedCat === "Unidade Orgânica" ? "Unidade Orgânica" : ""),
           unidadeOrganica: matchedCat || prev.unidadeOrganica,
           unidadeSelecionada: matchedDir || prev.unidadeSelecionada,
           departamento: matchedDep || prev.departamento,
@@ -3233,14 +3320,11 @@ export default function ActivityForm({
         valorDiario: 0,
       };
     } else {
-      const isBensRubric =
-        rubrica.rubrica?.toLowerCase().includes("bens") ||
-        rubrica.rubrica?.includes("121");
-      const cleanKey = getCleanNecessidadeKey(necessidade);
-      const filteredFromState = products.filter((p: any) => {
-        const pNecClean = getCleanNecessidadeKey(p.necessidade);
-        return pNecClean === cleanKey;
-      });
+      const filteredFromState = getFilteredProductsForRubrica(
+        products,
+        rubrica.rubrica,
+        necessidade
+      );
       
       newRubricas[index] = {
         ...rubrica,
@@ -3249,15 +3333,17 @@ export default function ActivityForm({
 
       if (filteredFromState.length > 0) {
         const firstProd = filteredFromState[0];
-        const precoUnitario = isBensRubric ? "" : firstProd.preco;
-        const valorTotal = isBensRubric ? 0 : 1 * firstProd.preco;
+        const prc = Number(firstProd.preco) || 0;
+        const qtd = rubrica.quantidade || 1;
+        const valorTotal = qtd * prc;
+
         newRubricas[index] = {
           ...newRubricas[index],
           nomeProduto: firstProd.nome,
-          precoUnitario: precoUnitario as any,
-          detalhes: firstProd.unidade,
-          especificacao: firstProd.especificacao,
-          quantidade: 1,
+          precoUnitario: prc as any,
+          detalhes: firstProd.unidade || "Unidade",
+          especificacao: firstProd.especificacao || "",
+          quantidade: qtd,
           valorTotal,
           valorDiario: 0,
         };
@@ -3266,8 +3352,8 @@ export default function ActivityForm({
           ...rubrica,
           necessidade,
           valorDiario: 0,
-          precoUnitario: isBensRubric ? ("" as any) : rubrica.precoUnitario,
-          valorTotal: isBensRubric ? 0 : rubrica.valorTotal,
+          precoUnitario: rubrica.precoUnitario || ("" as any),
+          valorTotal: rubrica.valorTotal || 0,
         };
       }
     }
@@ -3323,7 +3409,7 @@ export default function ActivityForm({
                       }));
                       setAutoFilled(true);
                     } else if (activeUser.unidade || activeUser.direcao || activeUser.departamento) {
-                      const directCat = activeUser.unidade || activeUser.unidadeOrganica || "Serviços Centrais";
+                      const directCat = activeUser.unidade || activeUser.unidadeOrganica || "Unidade Orgânica";
                       if (directCat) setSelectedCategory(directCat);
                       setFormData((prev) => ({
                         ...prev,
@@ -3517,8 +3603,8 @@ export default function ActivityForm({
                       departamento: selectedDept,
                       unidadeCentral:
                         prev.unidadeCentral ||
-                        (group.matchedCat === "Serviços Centrais"
-                          ? "Serviços Centrais"
+                        (group.matchedCat === "Unidade Orgânica"
+                          ? "Unidade Orgânica"
                           : ""),
                       unidadeOrganica: group.matchedCat || prev.unidadeOrganica,
                       unidadeSelecionada:
@@ -5678,54 +5764,21 @@ export default function ActivityForm({
                                       const selectedProdName = e.target.value;
                                       if (selectedProdName === "__custom__") return;
                                       
-                                      const filtered = products.filter((p: any) => {
-                                        const currentNecRaw = rubrica.necessidade || "";
-                                        const productNecRaw = p.necessidade || "";
-                                        const currentRubRaw = rubrica.rubrica || "";
-                                        const productRubRaw = p.rubrica || "";
-                                        
-                                        // 1. Tentar match exato por necessidade (incluindo código)
-                                        if (currentNecRaw && productNecRaw && currentNecRaw === productNecRaw) return true;
-
-                                        // 2. Match por código de necessidade
-                                        const currentNecCode = currentNecRaw.match(/^(\d+)/)?.[1];
-                                        const productNecCode = productNecRaw?.match?.(/^(\d+)/)?.[1];
-                                        if (currentNecCode && productNecCode && currentNecCode === productNecCode) return true;
-                                        
-                                        // 3. Match por nome de necessidade (limpo)
-                                        const currentNecName = currentNecRaw.replace(/^\d+\s*-\s*/, "").trim().toLowerCase();
-                                        const productNecName = productNecRaw?.replace?.(/^\d+\s*-\s*/, "").trim().toLowerCase();
-                                        if (currentNecName && productNecName && (currentNecName === productNecName || productNecName.includes(currentNecName))) return true;
-                                        
-                                        // 4. Fallback: match por código de rubrica
-                                        const currentRubCode = currentRubRaw.match(/(\d+)$/)?.[1] || currentRubRaw.match(/^(\d+)/)?.[1];
-                                        const productRubCode = productRubRaw?.match?.(/(\d+)$/)?.[1] || productRubRaw?.match?.(/^(\d+)/)?.[1];
-                                        if (currentRubCode && productRubCode && currentRubCode === productRubCode) return true;
-
-                                        // 5. Fallback final: match por nome de rubrica
-                                        const matchesRub = productRubRaw.toLowerCase().includes(currentRubRaw.toLowerCase()) || 
-                                                         currentRubRaw.toLowerCase().includes(productRubRaw.toLowerCase());
-                                        
-                                        if (matchesRub && (!productNecRaw || productNecRaw.toLowerCase().includes("geral") || productNecRaw === "TODAS")) return true;
-
-                                        return false;
-                                      });
-                                      
-                                      const found = filtered.find((p: any) => p.nome === selectedProdName);
+                                      const found = products.find((p: any) => p.nome === selectedProdName);
                                       
                                       const newRubricas = [...formData.rubricas];
                                       if (found) {
-                                        const isBensRubric = rubrica.rubrica === "Bens";
                                         const prc = Number(found.preco) || 0;
-                                        const valorTotal = (rubrica.quantidade || 1) * prc;
+                                        const qtd = rubrica.quantidade || 1;
+                                        const valorTotal = qtd * prc;
                                         
                                         newRubricas[index] = {
                                           ...rubrica,
                                           nomeProduto: found.nome,
-                                          precoUnitario: prc || (isBensRubric ? ("" as any) : 0),
-                                          detalhes: found.unidade || rubrica.detalhes,
-                                          especificacao: found.especificacao || rubrica.especificacao,
-                                          quantidade: rubrica.quantidade || 1,
+                                          precoUnitario: prc,
+                                          detalhes: found.unidade || rubrica.detalhes || "Unidade",
+                                          especificacao: found.especificacao || rubrica.especificacao || "",
+                                          quantidade: qtd,
                                           valorTotal,
                                         };
                                       } else {
@@ -5742,43 +5795,7 @@ export default function ActivityForm({
                                     }}
                                   >
                                     <option value="">Selecione o produto...</option>
-                                    {(() => {
-                                      const currentNecRaw = rubrica.necessidade || "";
-                                      const currentRubRaw = rubrica.rubrica || "";
-                                      
-                                      if (!currentNecRaw && !currentRubRaw) return [];
-
-                                      return products.filter((p: any) => {
-                                        const productNecRaw = p.necessidade || "";
-                                        const productRubRaw = p.rubrica || "";
-                                        
-                                        // 1. Tentar match exato por necessidade (incluindo código)
-                                        if (currentNecRaw && productNecRaw && currentNecRaw === productNecRaw) return true;
-
-                                        // 2. Match por código de necessidade
-                                        const currentNecCode = currentNecRaw.match(/^(\d+)/)?.[1];
-                                        const productNecCode = productNecRaw?.match?.(/^(\d+)/)?.[1];
-                                        if (currentNecCode && productNecCode && currentNecCode === productNecCode) return true;
-                                        
-                                        // 3. Match por nome de necessidade (limpo)
-                                        const currentNecName = currentNecRaw.replace(/^\d+\s*-\s*/, "").trim().toLowerCase();
-                                        const productNecName = productNecRaw?.replace?.(/^\d+\s*-\s*/, "").trim().toLowerCase();
-                                        if (currentNecName && productNecName && (currentNecName === productNecName || productNecName.includes(currentNecName))) return true;
-                                        
-                                        // 4. Fallback: match por código de rubrica
-                                        const currentRubCode = currentRubRaw.match(/(\d+)$/)?.[1] || currentRubRaw.match(/^(\d+)/)?.[1];
-                                        const productRubCode = productRubRaw?.match?.(/(\d+)$/)?.[1] || productRubRaw?.match?.(/^(\d+)/)?.[1];
-                                        if (currentRubCode && productRubCode && currentRubCode === productRubCode) return true;
-
-                                        // 5. Fallback final: match por nome de rubrica
-                                        const matchesRub = productRubRaw.toLowerCase().includes(currentRubRaw.toLowerCase()) || 
-                                                         currentRubRaw.toLowerCase().includes(productRubRaw.toLowerCase());
-                                        
-                                        if (matchesRub && (!productNecRaw || productNecRaw.toLowerCase().includes("geral") || productNecRaw === "TODAS")) return true;
-
-                                        return false;
-                                      });
-                                    })().map((prod: any) => (
+                                    {getFilteredProductsForRubrica(products, rubrica.rubrica, rubrica.necessidade).map((prod: any) => (
                                       <option key={prod.nome} value={prod.nome}>
                                         {prod.nome} — {Number(prod.preco || 0).toLocaleString("pt-MZ", { minimumFractionDigits: 2 })} MZN ({prod.unidade})
                                       </option>
@@ -6454,9 +6471,21 @@ export default function ActivityForm({
       </div>
     `;
 
+    const allocated = getUserAllocatedDetails();
+    const activeOrgao = formData.unidadeOrganica || allocated?.cat || activeUser?.unidadeOrganica || activeUser?.unidade || "UNIDADE ORGÂNICA";
+    const activeDirecao = formData.unidadeSelecionada || allocated?.dir || activeUser?.direcao || "DICOSAFA";
+    const activeDepartamento = formData.departamento || allocated?.dep || activeUser?.departamento || "";
+    const activeReparticao = formData.reparticao || allocated?.rep || activeUser?.reparticao || "";
+    const activeSetor = formData.setor || allocated?.setor || activeUser?.setor || activeUser?.sector || "";
+
     openPrintDocumentWindow({
       title: `FICHA DA ATIVIDADE - ${code}`,
       subtitle: `${name} - ${sector}`,
+      orgao: activeOrgao,
+      direcao: activeDirecao,
+      departamento: activeDepartamento,
+      reparticao: activeReparticao,
+      setor: activeSetor,
       contentHtml,
       orientation: "portrait",
     });
@@ -6843,7 +6872,7 @@ export default function ActivityForm({
                 </>
               ) : (
                 <>
-                  <Save size={18} /> Submeter o Registo
+                  <Save size={18} /> SUBMETER O PLANO DE ATIVIDADE
                 </>
               )}
             </button>

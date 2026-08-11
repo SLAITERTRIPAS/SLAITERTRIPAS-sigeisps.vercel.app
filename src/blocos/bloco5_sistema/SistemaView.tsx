@@ -533,13 +533,20 @@ export default function SistemaView({
       .toLowerCase()
       .includes("chefe de repartição de pessoal");
 
+  const isUGEAUser =
+    (user?.departamento || "").toLowerCase().includes("ugea") ||
+    (user?.setor || "").toLowerCase().includes("ugea") ||
+    (user?.reparticao || "").toLowerCase().includes("ugea") ||
+    (user?.title || "").toLowerCase().includes("ugea") ||
+    (user?.cargoChefia || "").toLowerCase().includes("ugea");
+
   const menuItems = [
     { title: "Diagnóstico & Autocura", icon: Sparkles, hidden: !canManageUsers },
     { title: "Centro de Mensagens", icon: MessageSquare },
     { title: "Sessões Ativas", icon: UserCheck, hidden: !canManageUsers },
     { title: "Log de Atividade", icon: Clock },
     { title: "Gestão de Utilizadores", icon: Users, hidden: !canManageUsers },
-    { title: "Gestão de Produtos e Preços", icon: Box, hidden: !canManageUsers },
+    { title: "Gestão de Produtos e Preços", icon: Box, hidden: !(canManageUsers || isUGEAUser) },
     { title: "Histórico de Chefias", icon: Clock },
     { title: "Atualização", icon: Zap, hidden: !canManageUsers },
     {

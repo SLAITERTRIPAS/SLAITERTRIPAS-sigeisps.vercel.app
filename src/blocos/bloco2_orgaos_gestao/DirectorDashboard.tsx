@@ -25,6 +25,7 @@ import {
   Car,
   ClipboardList,
   ShoppingCart,
+  Box,
 } from "lucide-react";
 
 import BoardOverview from "../bloco2_orgaos_gestao/BoardOverview";
@@ -70,6 +71,7 @@ import { confirmWorkspaceExit } from "../../lib/utils";
 import UGEA_PlanView from "../bloco4_servicos_centrais/UGEA_PlanView";
 import UGEA_SupplierManagementView from "../bloco4_servicos_centrais/UGEA_SupplierManagementView";
 import UGEA_SupplierRegistrationForm from "../bloco4_servicos_centrais/UGEA_SupplierRegistrationForm";
+import GestaoProdutosPrecosView from "../bloco9_produtos_precos/GestaoProdutosPrecosView";
 import AssinaturaDigitalView from "../bloco5_sistema/AssinaturaDigitalView";
 import CaixaMensagensView from "../bloco5_sistema/CaixaMensagensView";
 import BalancoMensalView from "../bloco4_servicos_centrais/BalancoMensalView";
@@ -186,9 +188,7 @@ export default function DirectorDashboard({
                 ? "Bolsa de Estudos"
                 : isEstatisticaMain
                   ? "Corpo discente"
-                  : isUGEA
-                    ? "Plano"
-                    : "Visão Geral"),
+                  : "Visão Geral"),
   );
 
   React.useEffect(() => {
@@ -376,6 +376,7 @@ export default function DirectorDashboard({
     if (isUGEA) {
       return [
         ...baseItems,
+        { title: "Gestão de Produtos e Preços", icon: Box },
         { title: "Gestão de Fornecedores", icon: Users },
         { title: "Plano de Aquisição", icon: FileText },
         { title: "Plano de Contratação", icon: FileText },
@@ -711,333 +712,8 @@ export default function DirectorDashboard({
   ]);
 
   const renderContent = () => {
-    if (
-      (activeItem === "Visão Geral" || activeItem === "Painel da UGEA") &&
-      isUGEA
-    ) {
-      const authorized = getAuthorizedActivities(matrixActivities || [], user);
-      const aquisicoes = authorized.filter(
-        (a) => a.necessitaAquisicao === "Sim",
-      );
-      const contratacoes = authorized.filter(
-        (a) => a.necessitaContratacao === "Sim",
-      );
-      const displayActivitiesCount = authorized.length;
-
-      const somaAquisicoes = aquisicoes.reduce(
-        (acc, a) => acc + (a.valor || 0),
-        0,
-      );
-      const somaContratacoes = contratacoes.reduce(
-        (acc, a) => acc + (a.valor || 0),
-        0,
-      );
-      const totalGeralUGEA = somaAquisicoes + somaContratacoes;
-
-      const ugeaColaboradores = (colaboradores || []).filter((c) => {
-        const s = String(
-          c.setor || c.reparticao || c.departamento || "",
-        ).toUpperCase();
-        return (
-          s.includes("UGEA") ||
-          s.includes("AQUISIÇÕES") ||
-          s.includes("AQUISICOES") ||
-          s.includes("DAF")
-        );
-      });
-
-      const finalColabs =
-        ugeaColaboradores.length > 0
-          ? ugeaColaboradores
-          : [
-              {
-                nome: "Albino Vilanculos",
-                cargo: "Chefe da UGEA",
-                email: "albino.v@gov.mz",
-                telefone: "841234567",
-              },
-              {
-                nome: "Sandra Tembe",
-                cargo: "Técnico de Aquisições",
-                email: "sandra.t@gov.mz",
-                telefone: "823456789",
-              },
-              {
-                nome: "Zacarias Mondlane",
-                cargo: "Assistente de Contratação",
-                email: "zacarias.m@gov.mz",
-                telefone: "857654321",
-              },
-            ];
-
-      return (
-        <div className="w-full space-y-8 pb-10">
-          {/* Cabeçalho do Painel da UGEA */}
-          <div className="bg-gradient-to-r from-[#0369a1] via-[#0284c7] to-[#0369a1] p-8 rounded-3xl text-white shadow-md relative overflow-hidden">
-            <div className="absolute right-0 top-0 opacity-10 transform translate-x-12 -translate-y-6 pointer-events-none">
-              <Building2 size={240} />
-            </div>
-
-            <div className="relative z-10 space-y-3">
-              <div className="inline-flex items-center gap-2 bg-white/10 px-4 py-1.5 rounded-full text-xs font-black tracking-widest uppercase">
-                <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
-                Área de Administração e Finanças
-              </div>
-
-              <h1 className="text-2xl md:text-3xl font-black tracking-tight text-white">
-                Unidade Gestora e Executora de Aquisições (UGEA)
-              </h1>
-
-              <p className="text-sky-100 max-w-2xl text-xs md:text-sm font-medium leading-relaxed">
-                Painel central de coordenação. Controle fornecedores,
-                orçamentos, aquisições e o efetivo alocado à UGEA de forma
-                simplificada e em tempo real.
-              </p>
-            </div>
-          </div>
-
-          {/* Seção 1: Fornecedores */}
-          <div className="space-y-3">
-            <div className="flex items-center justify-between border-l-4 border-sky-500 pl-3">
-              <h2 className="text-xs font-black tracking-widest text-slate-800 uppercase">
-                📂 Gestão de Fornecedores Licenciados
-              </h2>
-            </div>
-
-            <div className="bg-white p-3 rounded-2xl border border-slate-200/80 shadow-sm flex flex-col md:flex-row md:items-center md:justify-between gap-1 transition-all hover:border-sky-300 m-[2px]">
-              <div className="flex items-start gap-2 flex-1">
-                <div className="p-2 bg-sky-50 text-sky-600 rounded-xl">
-                  <Users size={20} />
-                </div>
-                <div>
-                  <h3 className="text-xs font-bold text-slate-500 uppercase tracking-wider">
-                    Fidelização e Conformidade
-                  </h3>
-                  <p className="text-sm font-black text-slate-800 mt-1">
-                    {suppliers?.length || 0} Fornecedores Registados no Sistema
-                  </p>
-                  <p className="text-[11px] text-slate-500 leading-normal mt-0.5 max-w-xl">
-                    Lista ativa de parceiros comerciais homologados pela UGEA
-                    para prestação de serviços e fornecimento de consumíveis.
-                  </p>
-                  {suppliers && suppliers.length > 0 && (
-                    <div className="flex flex-wrap gap-1.5 mt-2">
-                      {suppliers.slice(0, 3).map((sup, sIdx) => (
-                        <span
-                          key={sIdx}
-                          className="text-[10px] font-bold bg-slate-100 text-slate-700 px-2 py-0.5 rounded-lg border border-slate-200"
-                        >
-                          {sup.nome} ({sup.tipoServico || "Geral"})
-                        </span>
-                      ))}
-                      {suppliers.length > 3 && (
-                        <span className="text-[10px] font-bold bg-sky-50 text-sky-700 px-2 py-0.5 rounded-lg">
-                          +{suppliers.length - 3} mais
-                        </span>
-                      )}
-                    </div>
-                  )}
-                </div>
-              </div>
-              <div className="flex items-center gap-2 self-end md:self-auto">
-                <button
-                  onClick={() => navigateTo("UGEA_SupplierForm")}
-                  className="bg-sky-50 text-sky-700 hover:bg-sky-100 px-4 py-2 rounded-xl text-xs font-black transition-all"
-                >
-                  Registar Fornecedor
-                </button>
-                <button
-                  onClick={() => navigateTo("Gestão de Fornecedores")}
-                  className="bg-sky-600 text-white hover:bg-sky-700 px-4 py-2 rounded-xl text-xs font-black shadow-sm transition-all"
-                >
-                  Gerir Lista
-                </button>
-              </div>
-            </div>
-          </div>
-
-          {/* Seção 2: Plano de Contratação */}
-          <div className="space-y-3">
-            <div className="flex items-center justify-between border-l-4 border-amber-500 pl-3">
-              <h2 className="text-xs font-black tracking-widest text-slate-800 uppercase">
-                📋 Planos de Contratação Pública
-              </h2>
-            </div>
-
-            <div className="bg-white p-3 rounded-2xl border border-slate-200/80 shadow-sm flex flex-col md:flex-row md:items-center md:justify-between gap-2 transition-all hover:border-amber-300 m-[2px]">
-              <div className="flex items-start gap-4 flex-1">
-                <div className="p-3 bg-amber-50 text-amber-600 rounded-xl">
-                  <FileText size={24} />
-                </div>
-                <div>
-                  <h3 className="text-xs font-bold text-slate-500 uppercase tracking-wider">
-                    Submissão e Processamento
-                  </h3>
-                  <div className="flex items-baseline gap-2 mt-1">
-                    <p className="text-sm font-black text-slate-800">
-                      {contratacoes.length} Atividades que Necessitam
-                      Contratação
-                    </p>
-                    <span className="text-xs font-extrabold text-amber-600">
-                      (
-                      {somaContratacoes.toLocaleString("pt-MZ", {
-                        minimumFractionDigits: 2,
-                        maximumFractionDigits: 2,
-                      })}{" "}
-                      MZN)
-                    </span>
-                  </div>
-                  <p className="text-[11px] text-slate-500 leading-normal mt-0.5 max-w-xl">
-                    Controle de atividades que requerem publicação de concursos
-                    e assinatura de contratos públicos segundo as normas do
-                    Estado.
-                  </p>
-                </div>
-              </div>
-              <button
-                onClick={() => navigateTo("Plano de Contratação")}
-                className="bg-amber-600 text-white hover:bg-amber-700 px-5 py-2.5 rounded-xl text-xs font-black shadow-sm transition-all self-end md:self-auto"
-              >
-                Ver Plano de Contratação
-              </button>
-            </div>
-          </div>
-
-          {/* Seção 3: Plano de Aquisição */}
-          <div className="space-y-3">
-            <div className="flex items-center justify-between border-l-4 border-emerald-500 pl-3">
-              <h2 className="text-xs font-black tracking-widest text-slate-800 uppercase">
-                🛒 Plano de Aquisição de Bens e Serviços
-              </h2>
-            </div>
-
-            <div className="bg-white p-3 rounded-2xl border border-slate-200/80 shadow-sm flex flex-col md:flex-row md:items-center md:justify-between gap-2 transition-all hover:border-emerald-300 m-[2px]">
-              <div className="flex items-start gap-4 flex-1">
-                <div className="p-3 bg-emerald-50 text-emerald-600 rounded-xl">
-                  <ShoppingCart size={24} />
-                </div>
-                <div>
-                  <h3 className="text-xs font-bold text-slate-500 uppercase tracking-wider">
-                    Aquisições Diretas e Cotações
-                  </h3>
-                  <div className="flex items-baseline gap-2 mt-1">
-                    <p className="text-sm font-black text-slate-800">
-                      {aquisicoes.length} Itens Autorizados no Plano de
-                      Aquisição
-                    </p>
-                    <span className="text-xs font-extrabold text-emerald-600">
-                      (
-                      {somaAquisicoes.toLocaleString("pt-MZ", {
-                        minimumFractionDigits: 2,
-                        maximumFractionDigits: 2,
-                      })}{" "}
-                      MZN)
-                    </span>
-                  </div>
-                  <p className="text-[11px] text-slate-500 leading-normal mt-0.5 max-w-xl">
-                    Monitoramento dos consumíveis, equipamentos, combustíveis e
-                    despesas operacionais correntes sob a alçada da UGEA.
-                  </p>
-                </div>
-              </div>
-              <button
-                onClick={() => navigateTo("Plano de Aquisição")}
-                className="bg-emerald-600 text-white hover:bg-emerald-700 px-5 py-2.5 rounded-xl text-xs font-black shadow-sm transition-all self-end md:self-auto"
-              >
-                Ver Plano de Aquisição
-              </button>
-            </div>
-          </div>
-
-          {/* Seção 4: Atividades Planificadas */}
-          <div className="space-y-3">
-            <div className="flex items-center justify-between border-l-4 border-indigo-500 pl-3">
-              <h2 className="text-xs font-black tracking-widest text-slate-800 uppercase">
-                📊 Atividades Planificadas do Setor
-              </h2>
-            </div>
-
-            <div className="bg-white p-3 rounded-2xl border border-slate-200/80 shadow-sm flex flex-col md:flex-row md:items-center md:justify-between gap-2 transition-all hover:border-indigo-300 m-[2px]">
-              <div className="flex items-start gap-4 flex-1">
-                <div className="p-3 bg-indigo-50 text-indigo-600 rounded-xl">
-                  <CheckSquare size={24} />
-                </div>
-                <div>
-                  <h3 className="text-xs font-bold text-slate-500 uppercase tracking-wider">
-                    Metas e Calendarização
-                  </h3>
-                  <p className="text-sm font-black text-slate-800 mt-1">
-                    {isSuperBossUser(user) &&
-                      `${displayActivitiesCount} Atividades Planificadas no Plano do Setor`}
-                  </p>
-                  <p className="text-[11px] text-slate-500 leading-normal mt-0.5 max-w-xl">
-                    Rastreie as metas operacionais e o cronograma de atividades
-                    estipulado para a equipa da UGEA no corrente ano fiscal.
-                  </p>
-                </div>
-              </div>
-              <button
-                onClick={() => navigateTo("Plano")}
-                className="bg-indigo-600 text-white hover:bg-indigo-700 px-5 py-2.5 rounded-xl text-xs font-black shadow-sm transition-all self-end md:self-auto"
-              >
-                {isSuperBossUser(user) && "Aceder ao Plano do Setor"}
-              </button>
-            </div>
-          </div>
-
-          {/* Seção 5: Efetivo do Setor */}
-          <div className="space-y-3">
-            <div className="flex items-center justify-between border-l-4 border-slate-600 pl-3">
-              <h2 className="text-xs font-black tracking-widest text-slate-800 uppercase">
-                👥 Efetivo de Recursos Humanos do Setor
-              </h2>
-            </div>
-
-            <div className="bg-white p-3 rounded-2xl border border-slate-200/80 shadow-sm flex flex-col md:flex-row md:items-center md:justify-between gap-2 transition-all hover:border-slate-400 m-[2px]">
-              <div className="flex items-start gap-4 flex-1">
-                <div className="p-3 bg-slate-100 text-slate-600 rounded-xl">
-                  <User size={24} />
-                </div>
-                <div className="w-full">
-                  <h3 className="text-xs font-bold text-slate-500 uppercase tracking-wider">
-                    Equipa de Serviço Ativo
-                  </h3>
-                  <p className="text-sm font-black text-slate-800 mt-1">
-                    {finalColabs.length} Colaboradores Alocados à UGEA
-                  </p>
-
-                  {/* Lista de Colaboradores de Forma Compacta e Organizada */}
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mt-3 w-full">
-                    {finalColabs.map((col, idx) => (
-                      <div
-                        key={idx}
-                        className="bg-slate-50 border border-slate-100 p-2.5 rounded-xl flex items-center gap-2.5"
-                      >
-                        <div className="w-8 h-8 rounded-full bg-slate-200 flex items-center justify-center font-black text-slate-700 text-xs">
-                          {col.nome
-                            .split(" ")
-                            .map((n: any) => n[0])
-                            .join("")
-                            .substring(0, 2)
-                            .toUpperCase()}
-                        </div>
-                        <div className="min-w-0">
-                          <p className="text-xs font-bold text-slate-800 truncate">
-                            {col.nome}
-                          </p>
-                          <p className="text-[10px] text-slate-500 truncate">
-                            {col.cargo || "Funcionário"}
-                          </p>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      );
+    if (activeItem === "Gestão de Produtos e Preços") {
+      return <GestaoProdutosPrecosView />;
     }
 
     if (isUGEA) {

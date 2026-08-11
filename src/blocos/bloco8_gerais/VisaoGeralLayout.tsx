@@ -181,6 +181,23 @@ export default function VisaoGeralLayout({
     return colaboradores && colaboradores.length > 0 ? colaboradores : EFETIVO_GERAL_DATA;
   }, [colaboradores]);
 
+  const filteredDataset = useMemo(() => {
+    if (!selectedDirecao && !selectedDepartamento && !selectedReparticao) return dataset;
+    return dataset.filter((c) => {
+      const matchesDir = selectedDirecao
+        ? (c.direcao || "").toLowerCase().includes(selectedDirecao.toLowerCase()) ||
+          (c.unidade || "").toLowerCase().includes(selectedDirecao.toLowerCase())
+        : true;
+      const matchesDept = selectedDepartamento
+        ? (c.departamento || "").toLowerCase().includes(selectedDepartamento.toLowerCase())
+        : true;
+      const matchesRep = selectedReparticao
+        ? (c.reparticao || c.sector || "").toLowerCase().includes(selectedReparticao.toLowerCase())
+        : true;
+      return matchesDir && matchesDept && matchesRep;
+    });
+  }, [dataset, selectedDirecao, selectedDepartamento, selectedReparticao]);
+
   const isColaboradorInactive = (estado?: string) => {
     if (!estado) return false;
     const e = estado.toLowerCase().trim();
@@ -210,7 +227,7 @@ export default function VisaoGeralLayout({
   };
 
   const statsMetrics = useMemo(() => {
-    const listDocenteQuadro = dataset.filter((c) => {
+    const listDocenteQuadro = filteredDataset.filter((c) => {
       const isAdmin = checkIsSystemAdmin(c);
       if (isAdmin) return false;
       return (
@@ -220,7 +237,7 @@ export default function VisaoGeralLayout({
       );
     });
 
-    const listDocenteNaoQuadro = dataset.filter((c) => {
+    const listDocenteNaoQuadro = filteredDataset.filter((c) => {
       const isAdmin = checkIsSystemAdmin(c);
       if (isAdmin) return false;
       return (
@@ -230,7 +247,7 @@ export default function VisaoGeralLayout({
       );
     });
 
-    const listCTAQuadro = dataset.filter((c) => {
+    const listCTAQuadro = filteredDataset.filter((c) => {
       const isAdmin = checkIsSystemAdmin(c);
       if (isAdmin) return false;
       return (
@@ -240,7 +257,7 @@ export default function VisaoGeralLayout({
       );
     });
 
-    const listCTANaoQuadro = dataset.filter((c) => {
+    const listCTANaoQuadro = filteredDataset.filter((c) => {
       const isAdmin = checkIsSystemAdmin(c);
       if (isAdmin) return false;
       return (
@@ -250,16 +267,16 @@ export default function VisaoGeralLayout({
       );
     });
 
-    const listForaISPS = dataset.filter((c) => isColaboradorInactive(c.estado));
+    const listForaISPS = filteredDataset.filter((c) => isColaboradorInactive(c.estado));
 
-    const listChefiaDocentes = dataset.filter(
+    const listChefiaDocentes = filteredDataset.filter(
       (c) =>
         hasChefiaPosition(c) &&
         (c.tipo || "").toLowerCase() !== "cta" &&
         !isColaboradorInactive(c.estado)
     );
 
-    const listChefiaCTA = dataset.filter(
+    const listChefiaCTA = filteredDataset.filter(
       (c) =>
         hasChefiaPosition(c) &&
         (c.tipo || "").toLowerCase() === "cta" &&
@@ -275,181 +292,242 @@ export default function VisaoGeralLayout({
       chefiaDocentes: getGenderMetrics(listChefiaDocentes),
       chefiaCTA: getGenderMetrics(listChefiaCTA),
     };
-  }, [dataset]);
+  }, [filteredDataset]);
 
   const renderOverview = () => {
     const isPessoal = title.toLowerCase().includes("pessoal") || title.toLowerCase().includes("recursos humanos") || title.toLowerCase().includes("rh");
 
     if (isPessoal) {
+      const allDirecoes = Array.from(new Set(dataset.map(c => c.direcao || c.unidade).filter(Boolean))).sort();
+      const allDepartamentos = selectedDirecao 
+        ? Array.from(new Set(dataset.filter(c => (c.direcao === selectedDirecao || c.unidade === selectedDirecao)).map(c => c.departamento).filter(Boolean))).sort()
+        : [];
+
       return (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-6 p-4 max-w-[1600px] mx-auto w-full">
-          {/* Card 1: DOCENTE (QUADRO) */}
-          <div
-            onClick={() => onExploreColaboradores && onExploreColaboradores({ tipo: "Docente", efetivo: true })}
-            className="relative bg-white rounded-3xl p-6 border border-slate-300 flex flex-col items-center justify-between text-center hover:shadow-lg hover:scale-102 cursor-pointer transition-all duration-300 min-h-[220px]"
-          >
-            {/* Badge no topo direito */}
-            <div className="absolute top-4 right-4 bg-blue-50 text-blue-600 font-extrabold text-[11px] px-2 py-0.5 rounded-full min-w-6 h-6 flex items-center justify-center">
-              {statsMetrics.docenteQuadro.total}
-            </div>
-            {/* Ícone no topo */}
-            <div className="p-3.5 bg-blue-50 text-blue-600 rounded-2xl mb-4">
-              <UserCheck size={24} />
-            </div>
-            {/* Título */}
-            <h3 className="text-[11px] font-black text-slate-800 tracking-tight leading-tight uppercase mb-4 h-8 flex items-center justify-center">
-              Docente (Quadro)
-            </h3>
-            {/* Barra inferior */}
-            <div className="w-full text-[10px] font-extrabold text-blue-700 bg-blue-50/50 py-1.5 px-3 rounded-xl border border-blue-100/60 flex justify-between items-center">
-              <span>H: {statsMetrics.docenteQuadro.H}</span>
-              <span>M: {statsMetrics.docenteQuadro.M}</span>
-              <span className="font-black text-blue-900">Total: {statsMetrics.docenteQuadro.total}</span>
-            </div>
-          </div>
-
-          {/* Card 2: DOCENTE (FORA DO QUADRO) */}
-          <div
-            onClick={() => onExploreColaboradores && onExploreColaboradores({ tipo: "Docente", efetivo: false })}
-            className="relative bg-white rounded-3xl p-6 border border-slate-300 flex flex-col items-center justify-between text-center hover:shadow-lg hover:scale-102 cursor-pointer transition-all duration-300 min-h-[220px]"
-          >
-            {/* Badge no topo direito */}
-            <div className="absolute top-4 right-4 bg-orange-50 text-orange-600 font-extrabold text-[11px] px-2 py-0.5 rounded-full min-w-6 h-6 flex items-center justify-center">
-              {statsMetrics.docenteNaoQuadro.total}
-            </div>
-            {/* Ícone no topo */}
-            <div className="p-3.5 bg-orange-50 text-orange-600 rounded-2xl mb-4">
-              <UserX size={24} />
-            </div>
-            {/* Título */}
-            <h3 className="text-[11px] font-black text-slate-800 tracking-tight leading-tight uppercase mb-4 h-8 flex items-center justify-center">
-              Docente (Fora do Quadro)
-            </h3>
-            {/* Barra inferior */}
-            <div className="w-full text-[10px] font-extrabold text-orange-700 bg-orange-50/50 py-1.5 px-3 rounded-xl border border-orange-100/60 flex justify-between items-center">
-              <span>H: {statsMetrics.docenteNaoQuadro.H}</span>
-              <span>M: {statsMetrics.docenteNaoQuadro.M}</span>
-              <span className="font-black text-orange-900">Total: {statsMetrics.docenteNaoQuadro.total}</span>
-            </div>
-          </div>
-
-          {/* Card 3: CTA (QUADRO) */}
-          <div
-            onClick={() => onExploreColaboradores && onExploreColaboradores({ tipo: "CTA", efetivo: true })}
-            className="relative bg-white rounded-3xl p-6 border border-slate-300 flex flex-col items-center justify-between text-center hover:shadow-lg hover:scale-102 cursor-pointer transition-all duration-300 min-h-[220px]"
-          >
-            {/* Badge no topo direito */}
-            <div className="absolute top-4 right-4 bg-green-50 text-green-600 font-extrabold text-[11px] px-2 py-0.5 rounded-full min-w-6 h-6 flex items-center justify-center">
-              {statsMetrics.ctaQuadro.total}
-            </div>
-            {/* Ícone no topo */}
-            <div className="p-3.5 bg-green-50 text-green-600 rounded-2xl mb-4">
-              <Briefcase size={24} />
-            </div>
-            {/* Título */}
-            <h3 className="text-[11px] font-black text-slate-800 tracking-tight leading-tight uppercase mb-4 h-8 flex items-center justify-center">
-              CTA (Quadro)
-            </h3>
-            {/* Barra inferior */}
-            <div className="w-full text-[10px] font-extrabold text-green-700 bg-green-50/50 py-1.5 px-3 rounded-xl border border-green-100/60 flex justify-between items-center">
-              <span>H: {statsMetrics.ctaQuadro.H}</span>
-              <span>M: {statsMetrics.ctaQuadro.M}</span>
-              <span className="font-black text-green-900">Total: {statsMetrics.ctaQuadro.total}</span>
-            </div>
-          </div>
-
-          {/* Card 4: CTA (FORA DO QUADRO) */}
-          <div
-            onClick={() => onExploreColaboradores && onExploreColaboradores({ tipo: "CTA", efetivo: false })}
-            className="relative bg-white rounded-3xl p-6 border border-slate-300 flex flex-col items-center justify-between text-center hover:shadow-lg hover:scale-102 cursor-pointer transition-all duration-300 min-h-[220px]"
-          >
-            {/* Badge no topo direito */}
-            <div className="absolute top-4 right-4 bg-amber-50 text-amber-600 font-extrabold text-[11px] px-2 py-0.5 rounded-full min-w-6 h-6 flex items-center justify-center">
-              {statsMetrics.ctaNaoQuadro.total}
-            </div>
-            {/* Ícone no topo */}
-            <div className="p-3.5 bg-amber-50 text-amber-600 rounded-2xl mb-4">
-              <Archive size={24} />
-            </div>
-            {/* Título */}
-            <h3 className="text-[11px] font-black text-slate-800 tracking-tight leading-tight uppercase mb-4 h-8 flex items-center justify-center">
-              CTA (Fora do Quadro)
-            </h3>
-            {/* Barra inferior */}
-            <div className="w-full text-[10px] font-extrabold text-amber-700 bg-amber-50/50 py-1.5 px-3 rounded-xl border border-amber-100/60 flex justify-between items-center">
-              <span>H: {statsMetrics.ctaNaoQuadro.H}</span>
-              <span>M: {statsMetrics.ctaNaoQuadro.M}</span>
-              <span className="font-black text-amber-900">Total: {statsMetrics.ctaNaoQuadro.total}</span>
-            </div>
-          </div>
-
-          {/* Card 5: COLABORADORES FORA DO ISPS */}
-          <div
-            onClick={() => onExploreColaboradores && onExploreColaboradores({ foraISPS: true })}
-            className="relative bg-white rounded-3xl p-6 border border-slate-300 flex flex-col items-center justify-between text-center hover:shadow-lg hover:scale-102 cursor-pointer transition-all duration-300 min-h-[220px]"
-          >
-            {/* Badge no topo direito */}
-            <div className="absolute top-4 right-4 bg-rose-50 text-rose-600 font-extrabold text-[11px] px-2 py-0.5 rounded-full min-w-6 h-6 flex items-center justify-center">
-              {statsMetrics.foraISPS.total}
-            </div>
-            {/* Ícone no topo */}
-            <div className="p-3.5 bg-rose-50 text-rose-600 rounded-2xl mb-4">
-              <Briefcase size={24} />
-            </div>
-            {/* Título */}
-            <h3 className="text-[11px] font-black text-slate-800 tracking-tight leading-tight uppercase mb-4 h-8 flex items-center justify-center">
-              Colaboradores Fora do ISPS
-            </h3>
-            {/* Barra inferior */}
-            <div className="w-full text-[10px] font-extrabold text-rose-700 bg-rose-50/50 py-1.5 px-3 rounded-xl border border-rose-100/60 flex justify-between items-center">
-              <span>H: {statsMetrics.foraISPS.H}</span>
-              <span>M: {statsMetrics.foraISPS.M}</span>
-              <span className="font-black text-rose-900">Total: {statsMetrics.foraISPS.total}</span>
-            </div>
-          </div>
-
-          {/* Card 6: COLABORADORES COM CARGO DE CHEFIA */}
-          <div
-            onClick={() => onExploreColaboradores && onExploreColaboradores({ chefia: true })}
-            className="relative bg-white rounded-3xl p-6 border border-slate-300 flex flex-col items-center justify-between text-center hover:shadow-lg hover:scale-102 cursor-pointer transition-all duration-300 min-h-[220px]"
-          >
-            {/* Badge no topo direito */}
-            <div className="absolute top-4 right-4 bg-purple-50 text-purple-600 font-extrabold text-[11px] px-2 py-0.5 rounded-full min-w-6 h-6 flex items-center justify-center">
-              {statsMetrics.chefiaDocentes.total + statsMetrics.chefiaCTA.total}
-            </div>
-            {/* Ícone no topo */}
-            <div className="p-3.5 bg-purple-50 text-purple-600 rounded-2xl mb-4">
-              <ShieldCheck size={24} />
-            </div>
-            {/* Título */}
-            <h3 className="text-[11px] font-black text-slate-800 tracking-tight leading-tight uppercase mb-4 h-8 flex items-center justify-center">
-              Colaboradores com Cargo de Chefia
-            </h3>
-            {/* Caixa com as duas linhas */}
-            <div className="w-full flex flex-col gap-1.5 text-[9px] font-bold mt-1 bg-purple-50/50 p-2.5 rounded-xl border border-purple-100/60 text-purple-950">
-              <div 
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onExploreColaboradores && onExploreColaboradores({ chefiaDocente: true });
-                }}
-                className="flex justify-between items-center border-b border-purple-100/60 pb-1 cursor-pointer hover:bg-purple-100 p-1 rounded transition-all"
-              >
-                <span className="font-black text-purple-800 uppercase tracking-wider">Docente:</span>
-                <span className="font-mono text-slate-600">
-                  H: {statsMetrics.chefiaDocentes.H} | M: {statsMetrics.chefiaDocentes.M} | Total: {statsMetrics.chefiaDocentes.total}
-                </span>
+        <div className="flex flex-col gap-8">
+          {/* Seletor de Unidade para Repartição de Pessoal */}
+          <div className="bg-white p-6 rounded-[2rem] border border-slate-200 mx-4 max-w-[1600px] xl:mx-auto w-full shadow-sm">
+            <div className="flex flex-col md:flex-row items-end gap-4">
+              <div className="flex-1 w-full">
+                <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 px-1">
+                  Filtrar por Direção / Unidade Orgânica
+                </label>
+                <select
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm font-bold text-slate-900 outline-none focus:ring-2 focus:ring-blue-500 transition-all"
+                  value={selectedDirecao || ""}
+                  onChange={(e) => {
+                    setSelectedDirecao(e.target.value || null);
+                    setSelectedDepartamento(null);
+                  }}
+                >
+                  <option value="">Todas as Direções</option>
+                  {allDirecoes.map(d => (
+                    <option key={d} value={d}>{d}</option>
+                  ))}
+                </select>
               </div>
-              <div 
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onExploreColaboradores && onExploreColaboradores({ chefiaCTA: true });
-                }}
-                className="flex justify-between items-center pt-0.5 cursor-pointer hover:bg-purple-100 p-1 rounded transition-all"
-              >
-                <span className="font-black text-purple-800 uppercase tracking-wider">CTA:</span>
-                <span className="font-mono text-slate-600">
-                  H: {statsMetrics.chefiaCTA.H} | M: {statsMetrics.chefiaCTA.M} | Total: {statsMetrics.chefiaCTA.total}
-                </span>
+
+              {selectedDirecao && allDepartamentos.length > 0 && (
+                <div className="flex-1 w-full animate-fade-in-right">
+                  <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 px-1">
+                    Filtrar por Departamento
+                  </label>
+                  <select
+                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm font-bold text-slate-900 outline-none focus:ring-2 focus:ring-blue-500 transition-all"
+                    value={selectedDepartamento || ""}
+                    onChange={(e) => setSelectedDepartamento(e.target.value || null)}
+                  >
+                    <option value="">Todos os Departamentos</option>
+                    {allDepartamentos.map(d => (
+                      <option key={d} value={d}>{d}</option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
+              {(selectedDirecao || selectedDepartamento) && (
+                <button
+                  onClick={() => {
+                    setSelectedDirecao(null);
+                    setSelectedDepartamento(null);
+                  }}
+                  className="px-6 py-3 bg-slate-100 text-slate-600 rounded-xl text-xs font-black uppercase tracking-widest hover:bg-slate-200 transition-all"
+                >
+                  Limpar Filtros
+                </button>
+              )}
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-6 p-4 max-w-[1600px] mx-auto w-full">
+            {/* Card 1: DOCENTE (QUADRO) */}
+            <div
+              onClick={() => onExploreColaboradores && onExploreColaboradores({ tipo: "Docente", efetivo: true, direcao: selectedDirecao, departamento: selectedDepartamento })}
+              className="relative bg-white rounded-3xl p-6 border border-slate-300 flex flex-col items-center justify-between text-center hover:shadow-lg hover:scale-102 cursor-pointer transition-all duration-300 min-h-[220px]"
+            >
+              {/* Badge no topo direito */}
+              <div className="absolute top-4 right-4 bg-blue-50 text-blue-600 font-extrabold text-[11px] px-2 py-0.5 rounded-full min-w-6 h-6 flex items-center justify-center">
+                {statsMetrics.docenteQuadro.total}
+              </div>
+              {/* Ícone no topo */}
+              <div className="p-3.5 bg-blue-50 text-blue-600 rounded-2xl mb-4">
+                <UserCheck size={24} />
+              </div>
+              {/* Título */}
+              <h3 className="text-[11px] font-black text-slate-800 tracking-tight leading-tight uppercase mb-4 h-8 flex items-center justify-center">
+                Docente (Quadro)
+              </h3>
+              {/* Barra inferior */}
+              <div className="w-full text-[10px] font-extrabold text-blue-700 bg-blue-50/50 py-1.5 px-3 rounded-xl border border-blue-100/60 flex justify-between items-center">
+                <span>H: {statsMetrics.docenteQuadro.H}</span>
+                <span>M: {statsMetrics.docenteQuadro.M}</span>
+                <span className="font-black text-blue-900">Total: {statsMetrics.docenteQuadro.total}</span>
+              </div>
+            </div>
+
+            {/* Card 2: DOCENTE (FORA DO QUADRO) */}
+            <div
+              onClick={() => onExploreColaboradores && onExploreColaboradores({ tipo: "Docente", efetivo: false, direcao: selectedDirecao, departamento: selectedDepartamento })}
+              className="relative bg-white rounded-3xl p-6 border border-slate-300 flex flex-col items-center justify-between text-center hover:shadow-lg hover:scale-102 cursor-pointer transition-all duration-300 min-h-[220px]"
+            >
+              {/* Badge no topo direito */}
+              <div className="absolute top-4 right-4 bg-orange-50 text-orange-600 font-extrabold text-[11px] px-2 py-0.5 rounded-full min-w-6 h-6 flex items-center justify-center">
+                {statsMetrics.docenteNaoQuadro.total}
+              </div>
+              {/* Ícone no topo */}
+              <div className="p-3.5 bg-orange-50 text-orange-600 rounded-2xl mb-4">
+                <UserX size={24} />
+              </div>
+              {/* Título */}
+              <h3 className="text-[11px] font-black text-slate-800 tracking-tight leading-tight uppercase mb-4 h-8 flex items-center justify-center">
+                Docente (Fora do Quadro)
+              </h3>
+              {/* Barra inferior */}
+              <div className="w-full text-[10px] font-extrabold text-orange-700 bg-orange-50/50 py-1.5 px-3 rounded-xl border border-orange-100/60 flex justify-between items-center">
+                <span>H: {statsMetrics.docenteNaoQuadro.H}</span>
+                <span>M: {statsMetrics.docenteNaoQuadro.M}</span>
+                <span className="font-black text-orange-900">Total: {statsMetrics.docenteNaoQuadro.total}</span>
+              </div>
+            </div>
+
+            {/* Card 3: CTA (QUADRO) */}
+            <div
+              onClick={() => onExploreColaboradores && onExploreColaboradores({ tipo: "CTA", efetivo: true, direcao: selectedDirecao, departamento: selectedDepartamento })}
+              className="relative bg-white rounded-3xl p-6 border border-slate-300 flex flex-col items-center justify-between text-center hover:shadow-lg hover:scale-102 cursor-pointer transition-all duration-300 min-h-[220px]"
+            >
+              {/* Badge no topo direito */}
+              <div className="absolute top-4 right-4 bg-green-50 text-green-600 font-extrabold text-[11px] px-2 py-0.5 rounded-full min-w-6 h-6 flex items-center justify-center">
+                {statsMetrics.ctaQuadro.total}
+              </div>
+              {/* Ícone no topo */}
+              <div className="p-3.5 bg-green-50 text-green-600 rounded-2xl mb-4">
+                <Briefcase size={24} />
+              </div>
+              {/* Título */}
+              <h3 className="text-[11px] font-black text-slate-800 tracking-tight leading-tight uppercase mb-4 h-8 flex items-center justify-center">
+                CTA (Quadro)
+              </h3>
+              {/* Barra inferior */}
+              <div className="w-full text-[10px] font-extrabold text-green-700 bg-green-50/50 py-1.5 px-3 rounded-xl border border-green-100/60 flex justify-between items-center">
+                <span>H: {statsMetrics.ctaQuadro.H}</span>
+                <span>M: {statsMetrics.ctaQuadro.M}</span>
+                <span className="font-black text-green-900">Total: {statsMetrics.ctaQuadro.total}</span>
+              </div>
+            </div>
+
+            {/* Card 4: CTA (FORA DO QUADRO) */}
+            <div
+              onClick={() => onExploreColaboradores && onExploreColaboradores({ tipo: "CTA", efetivo: false, direcao: selectedDirecao, departamento: selectedDepartamento })}
+              className="relative bg-white rounded-3xl p-6 border border-slate-300 flex flex-col items-center justify-between text-center hover:shadow-lg hover:scale-102 cursor-pointer transition-all duration-300 min-h-[220px]"
+            >
+              {/* Badge no topo direito */}
+              <div className="absolute top-4 right-4 bg-amber-50 text-amber-600 font-extrabold text-[11px] px-2 py-0.5 rounded-full min-w-6 h-6 flex items-center justify-center">
+                {statsMetrics.ctaNaoQuadro.total}
+              </div>
+              {/* Ícone no topo */}
+              <div className="p-3.5 bg-amber-50 text-amber-600 rounded-2xl mb-4">
+                <Archive size={24} />
+              </div>
+              {/* Título */}
+              <h3 className="text-[11px] font-black text-slate-800 tracking-tight leading-tight uppercase mb-4 h-8 flex items-center justify-center">
+                CTA (Fora do Quadro)
+              </h3>
+              {/* Barra inferior */}
+              <div className="w-full text-[10px] font-extrabold text-amber-700 bg-amber-50/50 py-1.5 px-3 rounded-xl border border-amber-100/60 flex justify-between items-center">
+                <span>H: {statsMetrics.ctaNaoQuadro.H}</span>
+                <span>M: {statsMetrics.ctaNaoQuadro.M}</span>
+                <span className="font-black text-amber-900">Total: {statsMetrics.ctaNaoQuadro.total}</span>
+              </div>
+            </div>
+
+            {/* Card 5: COLABORADORES FORA DO ISPS */}
+            <div
+              onClick={() => onExploreColaboradores && onExploreColaboradores({ foraISPS: true, direcao: selectedDirecao, departamento: selectedDepartamento })}
+              className="relative bg-white rounded-3xl p-6 border border-slate-300 flex flex-col items-center justify-between text-center hover:shadow-lg hover:scale-102 cursor-pointer transition-all duration-300 min-h-[220px]"
+            >
+              {/* Badge no topo direito */}
+              <div className="absolute top-4 right-4 bg-rose-50 text-rose-600 font-extrabold text-[11px] px-2 py-0.5 rounded-full min-w-6 h-6 flex items-center justify-center">
+                {statsMetrics.foraISPS.total}
+              </div>
+              {/* Ícone no topo */}
+              <div className="p-3.5 bg-rose-50 text-rose-600 rounded-2xl mb-4">
+                <Briefcase size={24} />
+              </div>
+              {/* Título */}
+              <h3 className="text-[11px] font-black text-slate-800 tracking-tight leading-tight uppercase mb-4 h-8 flex items-center justify-center">
+                Colaboradores Fora do ISPS
+              </h3>
+              {/* Barra inferior */}
+              <div className="w-full text-[10px] font-extrabold text-rose-700 bg-rose-50/50 py-1.5 px-3 rounded-xl border border-rose-100/60 flex justify-between items-center">
+                <span>H: {statsMetrics.foraISPS.H}</span>
+                <span>M: {statsMetrics.foraISPS.M}</span>
+                <span className="font-black text-rose-900">Total: {statsMetrics.foraISPS.total}</span>
+              </div>
+            </div>
+
+            {/* Card 6: COLABORADORES COM CARGO DE CHEFIA */}
+            <div
+              onClick={() => onExploreColaboradores && onExploreColaboradores({ chefia: true, direcao: selectedDirecao, departamento: selectedDepartamento })}
+              className="relative bg-white rounded-3xl p-6 border border-slate-300 flex flex-col items-center justify-between text-center hover:shadow-lg hover:scale-102 cursor-pointer transition-all duration-300 min-h-[220px]"
+            >
+              {/* Badge no topo direito */}
+              <div className="absolute top-4 right-4 bg-purple-50 text-purple-600 font-extrabold text-[11px] px-2 py-0.5 rounded-full min-w-6 h-6 flex items-center justify-center">
+                {statsMetrics.chefiaDocentes.total + statsMetrics.chefiaCTA.total}
+              </div>
+              {/* Ícone no topo */}
+              <div className="p-3.5 bg-purple-50 text-purple-600 rounded-2xl mb-4">
+                <ShieldCheck size={24} />
+              </div>
+              {/* Título */}
+              <h3 className="text-[11px] font-black text-slate-800 tracking-tight leading-tight uppercase mb-4 h-8 flex items-center justify-center">
+                Colaboradores com Cargo de Chefia
+              </h3>
+              {/* Caixa com as duas linhas */}
+              <div className="w-full flex flex-col gap-1.5 text-[9px] font-bold mt-1 bg-purple-50/50 p-2.5 rounded-xl border border-purple-100/60 text-purple-950">
+                <div 
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onExploreColaboradores && onExploreColaboradores({ chefiaDocente: true, direcao: selectedDirecao, departamento: selectedDepartamento });
+                  }}
+                  className="flex justify-between items-center border-b border-purple-100/60 pb-1 cursor-pointer hover:bg-purple-100 p-1 rounded transition-all"
+                >
+                  <span className="font-black text-purple-800 uppercase tracking-wider">Docente:</span>
+                  <span className="font-mono text-slate-600">
+                    H: {statsMetrics.chefiaDocentes.H} | M: {statsMetrics.chefiaDocentes.M} | Total: {statsMetrics.chefiaDocentes.total}
+                  </span>
+                </div>
+                <div 
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onExploreColaboradores && onExploreColaboradores({ chefiaCTA: true, direcao: selectedDirecao, departamento: selectedDepartamento });
+                  }}
+                  className="flex justify-between items-center pt-0.5 cursor-pointer hover:bg-purple-100 p-1 rounded transition-all"
+                >
+                  <span className="font-black text-purple-800 uppercase tracking-wider">CTA:</span>
+                  <span className="font-mono text-slate-600">
+                    H: {statsMetrics.chefiaCTA.H} | M: {statsMetrics.chefiaCTA.M} | Total: {statsMetrics.chefiaCTA.total}
+                  </span>
+                </div>
               </div>
             </div>
           </div>

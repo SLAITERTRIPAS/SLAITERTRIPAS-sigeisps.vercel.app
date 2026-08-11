@@ -830,6 +830,7 @@ export default function ReportsView({
             technicalSheet={activeReport.technicalSheet}
             abbreviations={activeReport.abbreviations}
             onBack={() => setMode("consult")}
+            user={user}
           />
         )}
       </AnimatePresence>

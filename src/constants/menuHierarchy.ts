@@ -49,6 +49,7 @@ export const baseMenuItems = [
               { title: "Documentos Normativos" },
               { title: "Gestão de Expediente" },
               { title: "Relatórios" },
+              { title: "Gestão de Produtos e Preços" },
               { title: "Gestão de Fornecedores" },
               { title: "Plano de Aquisição" },
               { title: "Plano de Contratação" },
@@ -152,7 +153,7 @@ export const baseMenuItems = [
     ],
   },
   {
-    title: "Serviços Centrais",
+    title: "Unidade Orgânica",
     icon: Briefcase,
     color: "bg-gray-600",
     items: [

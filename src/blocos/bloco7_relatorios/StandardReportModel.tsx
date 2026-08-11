@@ -39,6 +39,7 @@ interface StandardReportModelProps {
   };
   sections: ReportSection[];
   onBack: () => void;
+  user?: any;
 }
 
 import { InstitutionalHeader } from "../../components/InstitutionalHeader";
@@ -58,12 +59,18 @@ export default function StandardReportModel({
   stats,
   sections,
   onBack,
+  user,
 }: StandardReportModelProps) {
   const handlePrint = () => {
     const reportElement = document.getElementById("standard-report-content");
     if (reportElement) {
       openPrintDocumentWindow({
         title: title || "Relatório de Atividades - ISPS",
+        orgao: user?.unidadeOrganica || user?.unidade || "UNIDADE ORGÂNICA",
+        direcao: user?.direcao || "DICOSAFA",
+        departamento: user?.departamento || "",
+        reparticao: user?.reparticao || "",
+        setor: user?.setor || user?.sector || "",
         contentHtml: reportElement.innerHTML,
         orientation: "auto",
         pageSize: "auto",
@@ -225,10 +232,12 @@ export default function StandardReportModel({
 
           <div className="w-full">
             <InstitutionalHeader 
-              direcaoName={direction || "ISPS"} 
-              sectorName=""
+              unidadeName={user?.unidadeOrganica || "UNIDADE ORGÂNICA"}
+              direcaoName={direction || user?.direcao || "ISPS"} 
+              departamentoName={user?.departamento}
+              reparticaoName={user?.reparticao}
+              sectorName={user?.setor}
               year={year}
-              unidadeName="SERVIÇOS CENTRAIS"
               title={semester ? `RELATÓRIO DO ${semester}º SEMESTRE DE ACTIVIDADES` : "RELATÓRIO ANUAL DE ACTIVIDADES"}
             />
           </div>

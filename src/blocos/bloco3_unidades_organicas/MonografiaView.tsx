@@ -59,7 +59,7 @@ export default function MonografiaView({
     "Agradeço primeiramente a Deus pela sabedoria e força concedidas durante este percurso. Ao meu orientador, pelas orientações valiosas e paciência dedicada. À Universidade Púnguè – Extensão de Tete, pela oportunidade de formação académica. Ao Instituto Superior Politécnico de Songo, pela disponibilidade em ceder informações institucionais. Aos colegas de curso, pela partilha de conhecimentos e experiências. Por fim, à minha família, pelo incentivo constante e compreensão nos momentos de ausência.",
   );
   const [resumoText, setResumoText] = useState(
-    'A presente monografia aborda o desenvolvimento do SIGEP (Sistema integrado de gestão de processos) para o Instituto Superior Politécnico de Songo (ISPS), instituição pública de ensino superior situada na Vila de Songo, Distrito de Cahora Bassa. O estudo analisa a estrutura organizacional do ISPS, composta por órgãos de direcção e gestão, unidades orgânicas e serviços centrais, bem como os sete cursos de engenharia oferecidos. O trabalho propõe uma solução informática integrada que automatiza processos completos de gestão académicos e administrativos, completando as limitações que o sistema atual SIGPro-ISPS não permite, o SIGPro-ISPS está voltado para a gestão estudantil financeira e aproveitamento pedagógico. A pesquisa fundamenta-se na análise documental, entrevistas com dirigentes e observação participante, resultando num modelo de sistema que integra gestão de estudantes, novos ingressos, matrículas e graduados, gestão documental, comunicação interna, gestão de correspondências e recursos humanos. O SIGEP visa melhorar a eficiência operacional, transparência institucional e experiência dos utilizadores, alinhando-se com o lema do ISPS: "Uma escola superior de engenharia para o sector de energia".',
+    'A presente monografia aborda o desenvolvimento do SIGEP (Sistema integrado de gestão de processos) para o Instituto Superior Politécnico de Songo (ISPS), instituição pública de ensino superior situada na Vila de Songo, Distrito de Cahora Bassa. O estudo analisa a estrutura organizacional do ISPS, composta por órgãos de direcção e gestão, unidades orgânicas e unidade orgânica, bem como os sete cursos de engenharia oferecidos. O trabalho propõe uma solução informática integrada que automatiza processos completos de gestão académicos e administrativos, completando as limitações que o sistema atual SIGPro-ISPS não permite, o SIGPro-ISPS está voltado para a gestão estudantil financeira e aproveitamento pedagógico. A pesquisa fundamenta-se na análise documental, entrevistas com dirigentes e observação participante, resultando num modelo de sistema que integra gestão de estudantes, novos ingressos, matrículas e graduados, gestão documental, comunicação interna, gestão de correspondências e recursos humanos. O SIGEP visa melhorar a eficiência operacional, transparência institucional e experiência dos utilizadores, alinhando-se com o lema do ISPS: "Uma escola superior de engenharia para o sector de energia".',
   );
   const [abstractText, setAbstractText] = useState(
     'This monograph addresses the development of SIGEP (Integrated Process Management System) for the Instituto Superior Politécnico de Songo (ISPS), a public higher education institution located in Songo Village, Cahora Bassa District. The study analyzes the organizational structure of ISPS, composed of management bodies, organic units, and central services, as well as the seven engineering courses offered. The work proposes an integrated IT solution that automates academic, administrative, and financial processes, overcoming the limitations of the current SIGPro-ISPS system. The research is based on document analysis, interviews with managers, and participant observation, resulting in a system model that integrates student management, enrollments, tuition fees, assessments, and human resources. SIGEP aims to improve operational efficiency, institutional transparency, and user experience, aligning with ISPS\'s motto: "A higher engineering school for the energy sector".',
@@ -478,7 +478,7 @@ export default function MonografiaView({
           </div>
           <div className="flex justify-between items-end border-b border-dotted border-gray-400 mb-1 ml-4">
             <span className="bg-white pr-2">
-              4.5 Serviços Centrais (Governação Administrativa)
+              4.5 Unidade Orgânica (Governação Administrativa)
             </span>
             <span className="bg-white pl-2">14</span>
           </div>
@@ -1071,14 +1071,14 @@ export default function MonografiaView({
     },
     {
       id: "desenvolvimento-servicos",
-      title: "4.5 Serviços Centrais",
+      title: "4.5 Unidade Orgânica",
       content: (
         <div className="space-y-6 font-serif text-justify">
           <h4 className="font-bold">
-            4.5 Serviços Centrais (Governação Administrativa)
+            4.5 Unidade Orgânica (Governação Administrativa)
           </h4>
           <p>
-            Os Serviços Centrais garantem o suporte necessário à actividade fim
+            Os Unidade Orgânica garantem o suporte necessário à actividade fim
             do Instituto. Abordagem exaustiva:
           </p>
           <ul className="list-disc ml-8 space-y-2">

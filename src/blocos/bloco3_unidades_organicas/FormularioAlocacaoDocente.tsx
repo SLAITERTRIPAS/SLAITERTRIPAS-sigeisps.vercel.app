@@ -694,7 +694,7 @@ export default function FormularioAlocacaoDocente({
                   <option value="Divisão de Economia e Gestão">
                     Divisão de Economia e Gestão
                   </option>
-                  <option value="Serviços Centrais">Serviços Centrais</option>
+                  <option value="Unidade Orgânica">Unidade Orgânica</option>
                 </select>
                 <ChevronDown
                   size={16}

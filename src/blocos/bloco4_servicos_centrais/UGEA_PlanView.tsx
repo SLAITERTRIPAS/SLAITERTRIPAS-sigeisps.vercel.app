@@ -77,48 +77,48 @@ export default function UGEAPlanView({
               <thead>
                 <tr className="bg-blue-900 text-white text-[10px] tracking-wider">
                   <th className="p-4 font-black border-r border-blue-800">
-                    Órgão
+                    N/O
                   </th>
                   <th className="p-4 font-black border-r border-blue-800">
-                    Referência
+                    NOME DA RUBRICA
                   </th>
                   <th className="p-4 font-black border-r border-blue-800">
-                    Actividade
+                    NOME DA NECESSIDADE
                   </th>
                   <th className="p-4 font-black border-r border-blue-800">
-                    Prazo
+                    NOME DO PRODUTO/SERVICO
                   </th>
                   <th className="p-4 font-black border-r border-blue-800">
-                    Responsável
+                    QUANTIDADE
                   </th>
                   <th className="p-4 font-black border-r border-blue-800">
-                    Valor Estimado
+                    VALOR TOTAL
                   </th>
                 </tr>
               </thead>
               <tbody>
-                {planActivities.map((activity) => (
+                {planActivities.map((activity, index) => (
                   <tr
                     key={activity.id}
-                    className="border-b hover:bg-gray-50 transition-colors"
+                    className="border-b hover:bg-gray-50 transition-colors text-xs"
                   >
-                    <td className="p-4 border-r font-medium text-gray-700">
-                      {activity.direcao} - {activity.departamento}
+                    <td className="p-4 border-r font-bold text-gray-700">
+                      {activity.no || String(index + 1).padStart(2, "0")}
                     </td>
-                    <td className="p-4 border-r font-mono text-xs text-gray-500">
-                      {activity.referencia}
+                    <td className="p-4 border-r font-medium text-gray-800">
+                      {activity.rubrica || "—"}
+                    </td>
+                    <td className="p-4 border-r font-medium text-gray-800">
+                      {activity.necessidade || "—"}
                     </td>
                     <td className="p-4 border-r font-bold text-gray-900">
-                      {activity.title}
+                      {activity.title || activity.produtoServico || "—"}
                     </td>
-                    <td className="p-4 border-r text-gray-600">
-                      {activity.prazo || activity.dataMes}
-                    </td>
-                    <td className="p-4 border-r text-gray-600">
-                      {activity.responsavel}
+                    <td className="p-4 border-r font-semibold text-gray-700">
+                      {activity.quantidade || activity.qtd || 1}
                     </td>
                     <td className="p-4 border-r font-black text-blue-900">
-                      {activity.valor.toLocaleString("pt-MZ", {
+                      {(activity.valor || 0).toLocaleString("pt-MZ", {
                         minimumFractionDigits: 2,
                         maximumFractionDigits: 2,
                       }) + " MZN"}

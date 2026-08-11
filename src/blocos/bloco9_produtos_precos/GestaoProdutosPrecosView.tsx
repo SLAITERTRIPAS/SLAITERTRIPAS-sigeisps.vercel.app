@@ -11,6 +11,8 @@ import {
   Filter,
   Edit3,
   Check,
+  DollarSign,
+  X,
 } from "lucide-react";
 import {
   getUnifiedProducts,
@@ -612,298 +614,341 @@ export default function GestaoProdutosPrecosView() {
         )}
       </div>
 
-      {/* EDIT MODAL */}
+      {/* EDIT MODAL - Passo VII Layout */}
       {editingProduct && (
-        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-[2rem] shadow-2xl max-w-lg w-full p-8 space-y-6 border border-gray-100">
-            <div className="flex justify-between items-center border-b border-gray-100 pb-4">
-              <h3 className="text-base font-black text-blue-950 font-serif">
-                Atualizar & Substituir Produto na Base de Dados
-              </h3>
-              <button
-                onClick={() => setEditingProduct(null)}
-                className="w-8 h-8 rounded-full bg-gray-100 text-gray-500 flex items-center justify-center hover:bg-gray-200 transition-colors"
-              >
-                ✕
-              </button>
-            </div>
-
-            <form onSubmit={handleSaveEdit} className="space-y-4">
-              <div>
-                <label className="block text-[10px] font-black text-blue-900 uppercase tracking-widest mb-1">
-                  Nome do Produto (Único)
-                </label>
-                <input
-                  type="text"
-                  required
-                  value={editingProduct.nome}
-                  onChange={(e) => setEditingProduct({ ...editingProduct, nome: e.target.value })}
-                  className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-xs font-bold text-gray-900 outline-none focus:border-blue-600"
-                />
-              </div>
-
-              <div>
-                <label className="block text-[10px] font-black text-blue-900 uppercase tracking-widest mb-1">
-                  Rúbrica Orçamental
-                </label>
-                <select
-                  value={editingProduct.rubrica || "Bens - 121"}
-                  onChange={(e) => setEditingProduct({ ...editingProduct, rubrica: e.target.value })}
-                  className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-xs font-bold text-gray-900 outline-none focus:border-blue-600"
-                >
-                  {RUBRICAS.map((r, i) => (
-                    <option key={i} value={r}>
-                      {r}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-[10px] font-black text-blue-900 uppercase tracking-widest mb-1">
-                  Necessidade Específica
-                </label>
-                <select
-                  value={editingProduct.necessidade || ""}
-                  onChange={(e) => setEditingProduct({ ...editingProduct, necessidade: e.target.value })}
-                  className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-xs font-bold text-gray-900 outline-none focus:border-blue-600"
-                >
-                  {getNecessidadesOptions(editingProduct.rubrica).map((nec, i) => (
-                    <option key={i} value={nec}>
-                      {formatNecessidadeWithCode(nec, editingProduct.rubrica)}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-[10px] font-black text-blue-900 uppercase tracking-widest mb-1">
-                  Preço Unificado (MZN)
-                </label>
-                <input
-                  type="number"
-                  step="0.01"
-                  required
-                  value={editingProduct.preco}
-                  onChange={(e) => setEditingProduct({ ...editingProduct, preco: e.target.value })}
-                  className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-xs font-bold text-gray-900 outline-none focus:border-blue-600"
-                />
-              </div>
-
-              <div>
-                <label className="block text-[10px] font-black text-blue-900 uppercase tracking-widest mb-1">
-                  Unidade de Medida
-                </label>
-                <input
-                  type="text"
-                  required
-                  value={editingProduct.unidade}
-                  onChange={(e) => setEditingProduct({ ...editingProduct, unidade: e.target.value })}
-                  className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-xs font-bold text-gray-900 outline-none focus:border-blue-600"
-                />
-              </div>
-
-              <div>
-                <label className="block text-[10px] font-black text-blue-900 uppercase tracking-widest mb-1">
-                  Especificação Técnica
-                </label>
-                <textarea
-                  rows={3}
-                  value={editingProduct.especificacao}
-                  onChange={(e) => setEditingProduct({ ...editingProduct, especificacao: e.target.value })}
-                  className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-xs font-bold text-gray-900 outline-none focus:border-blue-600"
-                />
-              </div>
-
-              <div className="flex justify-end gap-3 pt-4 border-t border-gray-100">
-                <button
-                  type="button"
-                  onClick={() => setEditingProduct(null)}
-                  className="px-6 py-2.5 bg-gray-100 text-gray-600 rounded-xl text-xs font-bold hover:bg-gray-200 transition-colors"
-                >
-                  Cancelar
-                </button>
-                <button
-                  type="submit"
-                  className="px-6 py-2.5 bg-blue-600 text-white rounded-xl text-xs font-black tracking-widest hover:bg-blue-700 transition-all shadow-md shadow-blue-200"
-                >
-                  Substituir na Base de Dados
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
+        <ProductFormPassoVIIModal
+          title="Atualizar & Substituir Produto na Base de Dados"
+          submitLabel="Substituir na Base de Dados"
+          productState={editingProduct}
+          setProductState={setEditingProduct}
+          onSubmit={handleSaveEdit}
+          onCancel={() => setEditingProduct(null)}
+        />
       )}
 
-      {/* NEW PRODUCT MODAL */}
+      {/* NEW PRODUCT MODAL - Passo VII Layout */}
       {isAddingNew && (
-        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-[2rem] shadow-2xl max-w-lg w-full p-8 space-y-6 border border-gray-100">
-            <div className="flex justify-between items-center border-b border-gray-100 pb-4">
-              <h3 className="text-base font-black text-blue-950 font-serif">
-                Registar Novo Produto Único
-              </h3>
-              <button
-                onClick={() => setIsAddingNew(false)}
-                className="w-8 h-8 rounded-full bg-gray-100 text-gray-500 flex items-center justify-center hover:bg-gray-200 transition-colors"
+        <ProductFormPassoVIIModal
+          title="Registar Novo Produto Único na Gestão de Preços"
+          submitLabel="Registar na Base de Dados"
+          productState={newProduct}
+          setProductState={setNewProduct}
+          onSubmit={handleAddNew}
+          onCancel={() => setIsAddingNew(false)}
+        />
+      )}
+    </div>
+  );
+}
+
+interface ProductFormPassoVIIProps {
+  title: string;
+  submitLabel: string;
+  productState: any;
+  setProductState: (val: any) => void;
+  onSubmit: (e: React.FormEvent) => void;
+  onCancel: () => void;
+}
+
+function ProductFormPassoVIIModal({
+  title,
+  submitLabel,
+  productState,
+  setProductState,
+  onSubmit,
+  onCancel,
+}: ProductFormPassoVIIProps) {
+  const cleanKey = (productState.necessidade || "").replace(/^\d+\s*-\s*/, "").trim();
+  const catalogProducts = PRODUTOS_POR_NECESSIDADE[cleanKey] || [];
+
+  return (
+    <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 overflow-y-auto">
+      <div className="bg-white rounded-[2.5rem] shadow-2xl max-w-6xl w-full p-6 md:p-8 space-y-6 border border-gray-100 my-8">
+        {/* Modal Header */}
+        <div className="flex justify-between items-center border-b border-gray-100 pb-4">
+          <div className="flex items-center gap-2">
+            <span className="w-3.5 h-3.5 rounded-full bg-blue-600"></span>
+            <h3 className="text-base font-black text-blue-950 font-serif">
+              {title}
+            </h3>
+          </div>
+          <button
+            type="button"
+            onClick={onCancel}
+            className="w-8 h-8 rounded-full bg-gray-100 text-gray-500 flex items-center justify-center hover:bg-gray-200 transition-colors"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+
+        <form onSubmit={onSubmit} className="space-y-6">
+          {/* Section 1: RÚBRICA & NECESSIDADE */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 bg-gray-50/70 p-5 rounded-2xl border border-gray-200/80">
+            <div>
+              <label className="block text-[10px] font-black text-[#1e3a8a] uppercase tracking-widest mb-1.5">
+                RÚBRICA ORÇAMENTAL
+              </label>
+              <select
+                value={productState.rubrica || RUBRICAS[0]}
+                onChange={(e) => {
+                  const r = e.target.value;
+                  const necs = getNecessidadesOptions(r);
+                  setProductState({
+                    ...productState,
+                    rubrica: r,
+                    necessidade: necs[0] || "",
+                  });
+                }}
+                className="w-full px-4 py-3 bg-white border border-blue-900/15 rounded-2xl text-[13px] font-bold text-slate-800 outline-none focus:border-blue-900 shadow-sm"
               >
-                ✕
-              </button>
+                {RUBRICAS.map((r, i) => (
+                  <option key={i} value={r}>
+                    {r}
+                  </option>
+                ))}
+              </select>
             </div>
 
-            <form onSubmit={handleAddNew} className="space-y-4">
-              {(() => {
-                const cleanKey = (newProduct.necessidade || "").replace(/^\d+\s*-\s*/, "").trim();
-                const standardProducts = PRODUTOS_POR_NECESSIDADE[cleanKey] || [];
-                if (standardProducts.length === 0) return null;
-                return (
-                  <div className="bg-blue-50/80 border border-blue-200 p-4 rounded-2xl space-y-2">
-                    <label className="block text-[10px] font-black text-blue-900 uppercase tracking-widest">
-                      ✨ Selecionar de Catálogo Padrão
-                    </label>
-                    <select
-                      onChange={(e) => {
-                        const val = e.target.value;
-                        if (val) {
-                          const selected = standardProducts.find((p) => p.nome === val);
-                          if (selected) {
-                            setNewProduct({
-                              ...newProduct,
-                              nome: selected.nome,
-                              preco: selected.preco,
-                              unidade: selected.unidade,
-                              especificacao: selected.especificacao,
-                            });
-                          }
-                        }
-                      }}
-                      className="w-full px-3 py-2.5 bg-white border border-gray-200 rounded-xl text-xs font-bold text-gray-800 outline-none focus:border-blue-600"
-                    >
-                      <option value="">-- Selecione um produto padrão se desejar --</option>
-                      {standardProducts.map((p, idx) => (
-                        <option key={idx} value={p.nome}>
-                          {p.nome} - {Number(p.preco).toLocaleString("pt-MZ")} MZN ({p.unidade})
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                );
-              })()}
+            <div>
+              <label className="block text-[10px] font-black text-[#1e3a8a] uppercase tracking-widest mb-1.5">
+                NECESSIDADE ESPECÍFICA
+              </label>
+              <select
+                value={productState.necessidade || ""}
+                onChange={(e) =>
+                  setProductState({
+                    ...productState,
+                    necessidade: e.target.value,
+                  })
+                }
+                className="w-full px-4 py-3 bg-white border border-blue-900/15 rounded-2xl text-[13px] font-bold text-slate-800 outline-none focus:border-blue-900 shadow-sm"
+              >
+                {getNecessidadesOptions(productState.rubrica).map((nec, i) => (
+                  <option key={i} value={nec}>
+                    {formatNecessidadeWithCode(nec, productState.rubrica)}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
 
-              <div>
-                <label className="block text-[10px] font-black text-blue-900 uppercase tracking-widest mb-1">
-                  Nome do Produto
+          {/* Section 2: BLOCO AZUL DE SELEÇÃO DE PRODUTO - EXATO DO PASSO VII */}
+          <div className="bg-[#f8fafc]/90 p-6 rounded-[28px] border border-slate-200/60 shadow-sm backdrop-blur-sm">
+            <div className="grid grid-cols-1 xl:grid-cols-12 gap-6 items-start">
+              {/* Coluna 1: SELEÇÃO DE PRODUTO/SERVIÇO (GESTÃO DE PREÇOS) */}
+              <div className="xl:col-span-3 space-y-2.5">
+                <label className="block text-[10px] font-black text-[#1e3a8a] uppercase tracking-widest flex items-center gap-1.5 mb-1.5">
+                  <DollarSign className="w-3.5 h-3.5 text-blue-600" />
+                  $ SELEÇÃO DE PRODUTO/SERVIÇO (GESTÃO DE PREÇOS)
                 </label>
-                <input
-                  type="text"
-                  required
-                  placeholder="Ex: Tinteiro HP LaserJet"
-                  value={newProduct.nome}
-                  onChange={(e) => setNewProduct({ ...newProduct, nome: e.target.value })}
-                  className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-xs font-bold text-gray-900 outline-none focus:border-blue-600"
-                />
+                <div className="space-y-2.5">
+                  <select
+                    value={
+                      catalogProducts.some((p) => p.nome === productState.nome)
+                        ? productState.nome
+                        : productState.nome
+                        ? "__custom__"
+                        : ""
+                    }
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      if (val === "__custom__") return;
+                      const selected = catalogProducts.find((p) => p.nome === val);
+                      if (selected) {
+                        setProductState({
+                          ...productState,
+                          nome: selected.nome,
+                          preco: Number(selected.preco) || 0,
+                          unidade: selected.unidade || "Unidade",
+                          especificacao: selected.especificacao || "",
+                        });
+                      }
+                    }}
+                    className="w-full px-4 py-3 bg-white border border-blue-900/15 rounded-2xl text-[13px] font-bold text-slate-800 outline-none focus:border-blue-900 transition-all shadow-sm appearance-none"
+                    style={{
+                      backgroundImage: `url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%231e3a8a' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3e%3c/svg%3e")`,
+                      backgroundPosition: "right 1rem center",
+                      backgroundRepeat: "no-repeat",
+                      backgroundSize: "1em 1em",
+                    }}
+                  >
+                    <option value="">Selecione o produto...</option>
+                    {catalogProducts.map((p, idx) => (
+                      <option key={idx} value={p.nome}>
+                        {p.nome} — {Number(p.preco || 0).toLocaleString("pt-MZ", { minimumFractionDigits: 2 })} MZN ({p.unidade})
+                      </option>
+                    ))}
+                    <option value="__custom__">
+                      Outro produto personalizado (Digitar abaixo)
+                    </option>
+                  </select>
+
+                  <input
+                    type="text"
+                    value={productState.nome || ""}
+                    placeholder="Ou digite o nome do produto..."
+                    onChange={(e) =>
+                      setProductState({ ...productState, nome: e.target.value })
+                    }
+                    className="w-full px-4 py-3 bg-white border border-blue-900/15 rounded-2xl text-[13px] font-bold text-slate-800 outline-none focus:border-blue-900 transition-all shadow-sm"
+                  />
+                </div>
+                <p className="text-[9px] text-blue-800/60 italic leading-tight mt-1.5 flex items-center gap-1">
+                  💡 Apenas produtos registados na Gestão de Produtos são listados aqui.
+                </p>
               </div>
 
-              <div>
-                <label className="block text-[10px] font-black text-blue-900 uppercase tracking-widest mb-1">
-                  Rúbrica Orçamental
+              {/* Coluna 2: DETALHES / UNIDADE */}
+              <div className="xl:col-span-1 space-y-2.5">
+                <label className="block text-[10px] font-black text-[#1e3a8a] uppercase tracking-widest mb-1.5">
+                  DETALHES / UNIDADE
                 </label>
                 <select
-                  value={newProduct.rubrica}
-                  onChange={(e) => {
-                    const r = e.target.value;
-                    const necs = getNecessidadesOptions(r);
-                    setNewProduct({
-                      ...newProduct,
-                      rubrica: r,
-                      necessidade: necs[0] || "",
-                    });
+                  value={productState.unidade || "Unidade"}
+                  onChange={(e) =>
+                    setProductState({ ...productState, unidade: e.target.value })
+                  }
+                  className="w-full px-3 py-3 bg-white border border-blue-900/15 rounded-2xl text-[13px] font-bold text-slate-700 outline-none focus:border-blue-900 transition-all shadow-sm appearance-none"
+                  style={{
+                    backgroundImage: `url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%231e3a8a' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3e%3c/svg%3e")`,
+                    backgroundPosition: "right 0.8rem center",
+                    backgroundRepeat: "no-repeat",
+                    backgroundSize: "0.9em 0.9em",
                   }}
-                  className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-xs font-bold text-gray-900 outline-none focus:border-blue-600"
                 >
-                  {RUBRICAS.map((r, i) => (
-                    <option key={i} value={r}>
-                      {r}
+                  {[
+                    "Unidade",
+                    "Lote",
+                    "Global",
+                    "Kit",
+                    "Mês",
+                    "Trimestre",
+                    "Ano",
+                    "Kg",
+                    "Litro",
+                    "Metro",
+                    "Resma",
+                    "Caixa",
+                    "Pacote",
+                  ].map((opt) => (
+                    <option key={opt} value={opt}>
+                      {opt}
                     </option>
                   ))}
                 </select>
               </div>
 
-              <div>
-                <label className="block text-[10px] font-black text-blue-900 uppercase tracking-widest mb-1">
-                  Necessidade Específica
-                </label>
-                <select
-                  value={newProduct.necessidade}
-                  onChange={(e) => setNewProduct({ ...newProduct, necessidade: e.target.value })}
-                  className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-xs font-bold text-gray-900 outline-none focus:border-blue-600"
-                >
-                  {availableNecessidadesForNew.map((nec, i) => (
-                    <option key={i} value={nec}>
-                      {formatNecessidadeWithCode(nec, newProduct.rubrica)}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-[10px] font-black text-blue-900 uppercase tracking-widest mb-1">
-                  Preço Unitário (MZN)
-                </label>
-                <input
-                  type="number"
-                  step="0.01"
-                  required
-                  value={newProduct.preco}
-                  onChange={(e) => setNewProduct({ ...newProduct, preco: Number(e.target.value) })}
-                  className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-xs font-bold text-gray-900 outline-none focus:border-blue-600"
-                />
-              </div>
-
-              <div>
-                <label className="block text-[10px] font-black text-blue-900 uppercase tracking-widest mb-1">
-                  Unidade de Medida
-                </label>
-                <input
-                  type="text"
-                  required
-                  value={newProduct.unidade}
-                  onChange={(e) => setNewProduct({ ...newProduct, unidade: e.target.value })}
-                  className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-xs font-bold text-gray-900 outline-none focus:border-blue-600"
-                />
-              </div>
-
-              <div>
-                <label className="block text-[10px] font-black text-blue-900 uppercase tracking-widest mb-1">
-                  Especificação Técnica
+              {/* Coluna 3: DESCRIÇÃO / ESPECIFICAÇÃO */}
+              <div className="xl:col-span-4 space-y-2.5">
+                <label className="block text-[10px] font-black text-[#1e3a8a] uppercase tracking-widest mb-1.5">
+                  DESCRIÇÃO / ESPECIFICAÇÃO
                 </label>
                 <textarea
-                  rows={3}
-                  value={newProduct.especificacao}
-                  onChange={(e) => setNewProduct({ ...newProduct, especificacao: e.target.value })}
-                  className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-xs font-bold text-gray-900 outline-none focus:border-blue-600"
+                  value={productState.especificacao || ""}
+                  placeholder="Descrição detalhada..."
+                  onChange={(e) =>
+                    setProductState({
+                      ...productState,
+                      especificacao: e.target.value,
+                    })
+                  }
+                  className="w-full p-4 bg-white border border-blue-900/10 rounded-2xl min-h-[110px] text-[12px] font-bold text-slate-700 leading-relaxed shadow-sm outline-none focus:border-blue-900 transition-all"
                 />
               </div>
 
-              <div className="flex justify-end gap-3 pt-4 border-t border-gray-100">
-                <button
-                  type="button"
-                  onClick={() => setIsAddingNew(false)}
-                  className="px-6 py-2.5 bg-gray-100 text-gray-600 rounded-xl text-xs font-bold hover:bg-gray-200 transition-colors"
-                >
-                  Cancelar
-                </button>
-                <button
-                  type="submit"
-                  className="px-6 py-2.5 bg-emerald-600 text-white rounded-xl text-xs font-black tracking-widest hover:bg-emerald-700 transition-all shadow-md shadow-emerald-200"
-                >
-                  Registar na Base de Dados
-                </button>
+              {/* Coluna 4: NOME DO PRODUTO & QUANTIDADE */}
+              <div className="xl:col-span-2 space-y-4">
+                <div className="space-y-1.5">
+                  <label className="block text-[10px] font-black text-[#1e3a8a] uppercase tracking-widest mb-1">
+                    NOME DO PRODUTO
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={productState.nome || ""}
+                    onChange={(e) =>
+                      setProductState({ ...productState, nome: e.target.value })
+                    }
+                    className="w-full px-4 py-3 bg-white border border-blue-900/15 rounded-2xl text-[13px] font-bold text-slate-800 outline-none focus:border-blue-900 shadow-sm"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <label className="block text-[10px] font-black text-[#1e3a8a] uppercase tracking-widest mb-1">
+                    QUANTIDADE
+                  </label>
+                  <input
+                    type="number"
+                    min="1"
+                    value={productState.quantidade || 1}
+                    onChange={(e) =>
+                      setProductState({
+                        ...productState,
+                        quantidade: Math.max(1, Number(e.target.value)),
+                      })
+                    }
+                    className="w-full px-4 py-3 bg-white border border-blue-900/15 rounded-2xl text-[13px] font-bold text-slate-800 outline-none focus:border-blue-900 shadow-sm"
+                  />
+                </div>
               </div>
-            </form>
+
+              {/* Coluna 5: PREÇO UNITARIO & TOTAL EM MZN */}
+              <div className="xl:col-span-2 grid grid-cols-1 gap-4 bg-white/60 p-5 rounded-[24px] border border-blue-900/10 items-end shadow-sm">
+                <div className="space-y-1.5">
+                  <label className="block text-[10px] font-black text-[#1e3a8a] uppercase tracking-widest mb-1">
+                    PREÇO UNITARIO (MZN)
+                  </label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    required
+                    value={productState.preco ?? ""}
+                    onChange={(e) =>
+                      setProductState({
+                        ...productState,
+                        preco: Number(e.target.value),
+                      })
+                    }
+                    className="w-full px-4 py-3 bg-white border border-blue-900/15 rounded-2xl text-[13px] font-bold text-slate-800 outline-none focus:border-blue-900 shadow-sm font-mono"
+                  />
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="block text-[10px] font-black text-[#1e3a8a] uppercase tracking-widest mb-1">
+                    TOTAL EM MZN
+                  </label>
+                  <div className="bg-[#edf5ff] p-3 rounded-2xl text-center border border-blue-100 font-mono font-black text-blue-900 text-sm shadow-inner">
+                    {(
+                      (productState.quantidade || 1) *
+                      (Number(productState.preco) || 0)
+                    ).toLocaleString("pt-MZ", {
+                      minimumFractionDigits: 2,
+                      maximumFractionDigits: 2,
+                    })}{" "}
+                    MZN
+                  </div>
+                </div>
+              </div>
+            </div>
           </div>
-        </div>
-      )}
+
+          {/* Form Submit Footer */}
+          <div className="flex justify-end gap-3 pt-4 border-t border-gray-100">
+            <button
+              type="button"
+              onClick={onCancel}
+              className="px-6 py-3 bg-gray-100 text-gray-700 rounded-2xl text-xs font-bold hover:bg-gray-200 transition-colors"
+            >
+              Cancelar
+            </button>
+            <button
+              type="submit"
+              className="px-8 py-3 bg-blue-900 hover:bg-blue-950 text-white rounded-2xl text-xs font-black tracking-widest transition-all shadow-lg shadow-blue-900/20"
+            >
+              {submitLabel}
+            </button>
+          </div>
+        </form>
+      </div>
     </div>
   );
 }

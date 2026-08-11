@@ -128,7 +128,7 @@ export default function SubMenu({
   }
 
   const titleUpper = title.toUpperCase();
-  const isServicosCentrais = titleUpper.includes("SERVIÇOS CENTRAIS");
+  const isServicosCentrais = titleUpper.includes("UNIDADE ORGÂNICA") || titleUpper.includes("UNIDADE ORGANICA");
   const isGabineteDG =
     titleUpper.includes("GABINETE DO DIRETOR") ||
     titleUpper.includes("GABINETE DO DIRECTOR") ||
