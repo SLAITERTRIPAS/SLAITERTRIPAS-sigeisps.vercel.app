@@ -66,8 +66,13 @@ export function sanitizeForJSON(obj: any, seen = new WeakSet()): any {
     obj.nodeType ||
     obj.$$typeof ||
     obj.nativeEvent ||
-    obj.src ||
-    (obj.constructor && obj.constructor !== Object && obj.constructor !== Array && obj.constructor.name && obj.constructor.name !== 'Object' && obj.constructor.name !== 'Array')
+    (obj.src && typeof obj.src !== "string") ||
+    (obj.constructor && 
+     obj.constructor !== Object && 
+     obj.constructor !== Array && 
+     obj.constructor.name && 
+     obj.constructor.name !== 'Object' && 
+     obj.constructor.name !== 'Array')
   ) {
     return undefined;
   }
@@ -138,8 +143,13 @@ export const getCircularReplacer = () => {
         value.nodeType ||
         value.$$typeof ||
         value.nativeEvent ||
-        value.src ||
-        (value.constructor && value.constructor !== Object && value.constructor !== Array && value.constructor.name && value.constructor.name !== 'Object' && value.constructor.name !== 'Array')
+        (value.src && typeof value.src !== "string") ||
+        (value.constructor && 
+         value.constructor !== Object && 
+         value.constructor !== Array && 
+         value.constructor.name && 
+         value.constructor.name !== 'Object' && 
+         value.constructor.name !== 'Array')
       ) {
         if (typeof value.toDate === "function") {
           try {
@@ -148,8 +158,8 @@ export const getCircularReplacer = () => {
             return null;
           }
         }
-        if (value.path) return value.path;
-        if (value.id) return value.id;
+        if (value.path) return String(value.path);
+        if (value.id) return String(value.id);
         return undefined;
       }
       if (seen.has(value)) {

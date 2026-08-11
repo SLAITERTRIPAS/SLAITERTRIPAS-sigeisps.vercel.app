@@ -23,42 +23,54 @@ export const InstitutionalHeader = ({
   const displaySector = (sectorName || direcaoName || "").toUpperCase();
 
   return (
-    <div className="text-center mb-3 flex flex-col items-center w-full bg-white p-6 rounded-t-3xl">
-      <div className="mb-4">
+    <div className="text-center mb-6 flex flex-col items-center w-full bg-white p-8 rounded-t-[2.5rem]">
+      {/* 1. Logotipo */}
+      <div className="mb-6">
         <img
           src="https://lh3.googleusercontent.com/d/11zvvpOpZARM1yk_irEDpjJ-qBKlTlhad"
           alt="Logo ISPS"
-          className="w-32 h-32 object-contain"
+          className="w-36 h-auto object-contain"
           referrerPolicy="no-referrer"
         />
       </div>
 
-      <h2 className="text-3xl font-black text-slate-900 uppercase tracking-tight mb-1">
+      {/* 2. Nome do Instituto */}
+      <h2 className="text-[2.2rem] font-black text-slate-900 uppercase tracking-tight mb-1.5 leading-none">
         INSTITUTO SUPERIOR POLITÉCNICO DE SONGO
       </h2>
-      <h3 className="text-sm font-bold text-slate-700 uppercase tracking-wide mb-0">
+
+      {/* 3. Província */}
+      <h3 className="text-base font-bold text-slate-700 uppercase tracking-[0.1em] mb-0.5">
         PROVÍNCIA DE TETE
       </h3>
-      <h3 className="text-sm font-bold text-slate-700 uppercase tracking-wide mb-1">
+
+      {/* 4. Distrito */}
+      <h3 className="text-base font-bold text-slate-700 uppercase tracking-[0.1em] mb-4">
         DISTRITO DE CAHORA-BASSA
       </h3>
       
-      <div className="mt-4 space-y-1">
-        <h4 className="text-sm font-black text-slate-800 uppercase tracking-wide">
-          {displayUnidade}
-        </h4>
-        <h4 className="text-sm font-bold text-blue-900 uppercase tracking-wide">
-          {displayDirecao}
-        </h4>
-      </div>
+      {/* 5. Nome do Órgão */}
+      <h4 className="text-xl font-bold text-slate-900 uppercase tracking-tight mb-1">
+        {displayUnidade}
+      </h4>
 
-      <h5 className="text-lg font-black text-slate-900 uppercase mt-4 tracking-tighter border-b-4 border-slate-900 pb-2 px-10 text-center w-full max-w-4xl">
-        {title} {displaySector ? `- ${displaySector}` : ""}
+      {/* 6. Nome da Direção */}
+      <h4 className="text-xl font-bold text-slate-900 uppercase tracking-tight mb-4">
+        {displayDirecao}
+      </h4>
+
+      {/* 7. Título do Plano (EM VERMELHO) */}
+      <h5 className="text-[1.4rem] font-black text-red-600 uppercase mt-2 tracking-tight">
+        {title} {displaySector ? `(${displaySector})` : ""}
       </h5>
 
-      <div className="mt-6">
-        <span className="text-xl font-black text-slate-900 uppercase tracking-tighter bg-slate-100 px-6 py-2 rounded-2xl border-2 border-slate-200">
-          EXERCÍCIO ECONÓMICO: {year}
+      {/* 8. Linha Divisória */}
+      <div className="w-full max-w-5xl h-[3px] bg-slate-900 mt-6 mb-6"></div>
+
+      {/* 9. Exercício Económico */}
+      <div className="mt-2">
+        <span className="text-[1.3rem] font-black text-slate-900 uppercase tracking-tight bg-[#f1f5f9] px-10 py-3 rounded-[1.2rem] border border-slate-200 shadow-sm">
+          EXERCÍCIO ECONÓMICO: {year || 2027}
         </span>
       </div>
     </div>

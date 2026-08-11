@@ -82,7 +82,11 @@ interface ActivityFormProps {
 
 const getCleanNecessidadeKey = (nec: string): string => {
   if (!nec) return "";
-  return nec.replace(/^\d+\s*-\s*/, "").trim();
+  // Tenta extrair o código (ex: 121006)
+  const codeMatch = nec.match(/^(\d+)/);
+  if (codeMatch) return codeMatch[1];
+  // Se não tiver código, retorna o nome limpo e minúsculo
+  return nec.replace(/^\d+\s*-\s*/, "").trim().toLowerCase();
 };
 
 function calculateNextNum(acts: any[], targetSector?: string, currentUserArea?: string): number {
@@ -3233,15 +3237,18 @@ export default function ActivityForm({
         rubrica.rubrica?.toLowerCase().includes("bens") ||
         rubrica.rubrica?.includes("121");
       const cleanKey = getCleanNecessidadeKey(necessidade);
-      const products = PRODUTOS_POR_NECESSIDADE[cleanKey] || [];
+      const filteredFromState = products.filter((p: any) => {
+        const pNecClean = getCleanNecessidadeKey(p.necessidade);
+        return pNecClean === cleanKey;
+      });
       
       newRubricas[index] = {
         ...rubrica,
         necessidade,
       };
 
-      if (products.length > 0) {
-        const firstProd = products[0];
+      if (filteredFromState.length > 0) {
+        const firstProd = filteredFromState[0];
         const precoUnitario = isBensRubric ? "" : firstProd.preco;
         const valorTotal = isBensRubric ? 0 : 1 * firstProd.preco;
         newRubricas[index] = {
@@ -5649,444 +5656,275 @@ export default function ActivityForm({
                           </div>
                         </div>
                       ) : isBensServicos ? (
-                        <>
-                          {PRODUTOS_POR_NECESSIDADE[getCleanNecessidadeKey(rubrica.necessidade)] &&
-                            PRODUTOS_POR_NECESSIDADE[getCleanNecessidadeKey(rubrica.necessidade)]
-                              .length > 0 && (
-                              <div className="mb-4 bg-blue-50/70 p-4 rounded-2xl border border-blue-900/10">
-                                <label className="block text-[10px] font-black text-blue-900 uppercase tracking-widest mb-1.5 flex items-center gap-1.5">
+                        <div className="space-y-6">
+                          {/* BLOCO AZUL DE SELEÇÃO DE PRODUTO - LAYOUT HORIZONTAL DA IMAGEM */}
+                          <div className="bg-[#f8fafc]/90 p-6 rounded-[28px] border border-slate-200/60 shadow-sm backdrop-blur-sm">
+                            <div className="grid grid-cols-1 xl:grid-cols-12 gap-6 items-start">
+                              {/* Coluna 1: SELEÇÃO DE PRODUTO (3 colunas) */}
+                              <div className="xl:col-span-3 space-y-2.5">
+                                <label className="block text-[10px] font-black text-[#1e3a8a] uppercase tracking-widest flex items-center gap-1.5 mb-1.5">
                                   <DollarSign className="w-3.5 h-3.5 text-blue-600" />
-                                  Seleção de Produto da Rubrica e Necessidade (Mercado Moçambicano)
+                                  $ SELEÇÃO DE PRODUTO/SERVIÇO (GESTÃO DE PREÇOS)
                                 </label>
-                                <div className="space-y-2">
+                                <div className="space-y-2.5">
                                   <select
                                     value={
-                                      PRODUTOS_POR_NECESSIDADE[getCleanNecessidadeKey(rubrica.necessidade)].some(p => p.nome === rubrica.nomeProduto)
+                                      products.some(p => p.nome === rubrica.nomeProduto)
                                         ? rubrica.nomeProduto
                                         : (rubrica.nomeProduto ? "__custom__" : "")
                                     }
                                     disabled={isBlocked}
                                     onChange={(e) => {
                                       const selectedProdName = e.target.value;
-                                      if (selectedProdName === "__custom__") {
-                                        return;
-                                      }
-                                      const cleanCurrentNec = getCleanNecessidadeKey(rubrica.necessidade);
-                                      const baseProdList =
-                                        PRODUTOS_POR_NECESSIDADE[cleanCurrentNec] || [];
-                                      const unifiedProds = products.filter(
-                                        (p: any) =>
-                                          !p.necessidade ||
-                                          getCleanNecessidadeKey(p.necessidade) === cleanCurrentNec
-                                      );
-                                      const prodMap = new Map();
-                                      baseProdList.forEach((p: any) => prodMap.set(p.nome, p));
-                                      unifiedProds.forEach((p: any) => {
-                                        prodMap.set(p.nome, { nome: p.nome, preco: p.preco, unidade: p.unidade, especificacao: p.especificacao });
+                                      if (selectedProdName === "__custom__") return;
+                                      
+                                      const filtered = products.filter((p: any) => {
+                                        const currentNecRaw = rubrica.necessidade || "";
+                                        const productNecRaw = p.necessidade || "";
+                                        const currentRubRaw = rubrica.rubrica || "";
+                                        const productRubRaw = p.rubrica || "";
+                                        
+                                        // 1. Tentar match exato por necessidade (incluindo código)
+                                        if (currentNecRaw && productNecRaw && currentNecRaw === productNecRaw) return true;
+
+                                        // 2. Match por código de necessidade
+                                        const currentNecCode = currentNecRaw.match(/^(\d+)/)?.[1];
+                                        const productNecCode = productNecRaw?.match?.(/^(\d+)/)?.[1];
+                                        if (currentNecCode && productNecCode && currentNecCode === productNecCode) return true;
+                                        
+                                        // 3. Match por nome de necessidade (limpo)
+                                        const currentNecName = currentNecRaw.replace(/^\d+\s*-\s*/, "").trim().toLowerCase();
+                                        const productNecName = productNecRaw?.replace?.(/^\d+\s*-\s*/, "").trim().toLowerCase();
+                                        if (currentNecName && productNecName && (currentNecName === productNecName || productNecName.includes(currentNecName))) return true;
+                                        
+                                        // 4. Fallback: match por código de rubrica
+                                        const currentRubCode = currentRubRaw.match(/(\d+)$/)?.[1] || currentRubRaw.match(/^(\d+)/)?.[1];
+                                        const productRubCode = productRubRaw?.match?.(/(\d+)$/)?.[1] || productRubRaw?.match?.(/^(\d+)/)?.[1];
+                                        if (currentRubCode && productRubCode && currentRubCode === productRubCode) return true;
+
+                                        // 5. Fallback final: match por nome de rubrica
+                                        const matchesRub = productRubRaw.toLowerCase().includes(currentRubRaw.toLowerCase()) || 
+                                                         currentRubRaw.toLowerCase().includes(productRubRaw.toLowerCase());
+                                        
+                                        if (matchesRub && (!productNecRaw || productNecRaw.toLowerCase().includes("geral") || productNecRaw === "TODAS")) return true;
+
+                                        return false;
                                       });
-                                      const prodList = Array.from(prodMap.values());
-                                      const found: any = prodList.find(
-                                        (p: any) => p.nome === selectedProdName,
-                                      );
-                                      const newRubricas = [
-                                        ...formData.rubricas,
-                                      ];
+                                      
+                                      const found = filtered.find((p: any) => p.nome === selectedProdName);
+                                      
+                                      const newRubricas = [...formData.rubricas];
                                       if (found) {
-                                        const isBensRubric =
-                                          rubrica.rubrica === "Bens";
-                                        const precoUnitario = isBensRubric
-                                          ? ""
-                                          : found.preco;
-                                        const valorTotal = isBensRubric
-                                          ? 0
-                                          : (rubrica.quantidade || 1) *
-                                            found.preco;
+                                        const isBensRubric = rubrica.rubrica === "Bens";
+                                        const prc = Number(found.preco) || 0;
+                                        const valorTotal = (rubrica.quantidade || 1) * prc;
+                                        
                                         newRubricas[index] = {
                                           ...rubrica,
                                           nomeProduto: found.nome,
-                                          precoUnitario: precoUnitario as any,
-                                          detalhes: found.unidade,
-                                          especificacao: found.especificacao,
+                                          precoUnitario: prc || (isBensRubric ? ("" as any) : 0),
+                                          detalhes: found.unidade || rubrica.detalhes,
+                                          especificacao: found.especificacao || rubrica.especificacao,
                                           quantidade: rubrica.quantidade || 1,
                                           valorTotal,
                                         };
                                       } else {
-                                        newRubricas[index] = {
-                                          ...rubrica,
-                                          nomeProduto: "",
-                                        };
+                                        newRubricas[index] = { ...rubrica, nomeProduto: "" };
                                       }
-                                      setFormData({
-                                        ...formData,
-                                        rubricas: newRubricas,
-                                      });
+                                      setFormData({ ...formData, rubricas: newRubricas });
                                     }}
-                                    className="w-full px-4 py-3 bg-white border border-blue-900/30 rounded-xl text-[13px] font-bold text-blue-950 outline-none focus:border-blue-900 shadow-sm leading-none font-serif"
+                                    className="w-full px-4 py-3 bg-white border border-blue-900/15 rounded-2xl text-[13px] font-bold text-slate-800 outline-none focus:border-blue-900 transition-all shadow-sm appearance-none"
+                                    style={{
+                                      backgroundImage: `url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%231e3a8a' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3e%3c/svg%3e")`,
+                                      backgroundPosition: "right 1rem center",
+                                      backgroundRepeat: "no-repeat",
+                                      backgroundSize: "1em 1em",
+                                    }}
                                   >
-                                    <option value="">Selecione o produto associado à necessidade...</option>
+                                    <option value="">Selecione o produto...</option>
                                     {(() => {
-                                      const cleanCurrentNec = getCleanNecessidadeKey(rubrica.necessidade);
-                                      const baseP = PRODUTOS_POR_NECESSIDADE[cleanCurrentNec] || [];
-                                      const unifiedP = products.filter(
-                                        (p: any) =>
-                                          !p.necessidade ||
-                                          getCleanNecessidadeKey(p.necessidade) === cleanCurrentNec
-                                      );
-                                      const m = new Map();
-                                      baseP.forEach((p: any) => m.set(p.nome, p));
-                                      unifiedP.forEach((p: any) => m.set(p.nome, { nome: p.nome, preco: p.preco, unidade: p.unidade, especificacao: p.especificacao }));
-                                      return Array.from(m.values());
+                                      const currentNecRaw = rubrica.necessidade || "";
+                                      const currentRubRaw = rubrica.rubrica || "";
+                                      
+                                      if (!currentNecRaw && !currentRubRaw) return [];
+
+                                      return products.filter((p: any) => {
+                                        const productNecRaw = p.necessidade || "";
+                                        const productRubRaw = p.rubrica || "";
+                                        
+                                        // 1. Tentar match exato por necessidade (incluindo código)
+                                        if (currentNecRaw && productNecRaw && currentNecRaw === productNecRaw) return true;
+
+                                        // 2. Match por código de necessidade
+                                        const currentNecCode = currentNecRaw.match(/^(\d+)/)?.[1];
+                                        const productNecCode = productNecRaw?.match?.(/^(\d+)/)?.[1];
+                                        if (currentNecCode && productNecCode && currentNecCode === productNecCode) return true;
+                                        
+                                        // 3. Match por nome de necessidade (limpo)
+                                        const currentNecName = currentNecRaw.replace(/^\d+\s*-\s*/, "").trim().toLowerCase();
+                                        const productNecName = productNecRaw?.replace?.(/^\d+\s*-\s*/, "").trim().toLowerCase();
+                                        if (currentNecName && productNecName && (currentNecName === productNecName || productNecName.includes(currentNecName))) return true;
+                                        
+                                        // 4. Fallback: match por código de rubrica
+                                        const currentRubCode = currentRubRaw.match(/(\d+)$/)?.[1] || currentRubRaw.match(/^(\d+)/)?.[1];
+                                        const productRubCode = productRubRaw?.match?.(/(\d+)$/)?.[1] || productRubRaw?.match?.(/^(\d+)/)?.[1];
+                                        if (currentRubCode && productRubCode && currentRubCode === productRubCode) return true;
+
+                                        // 5. Fallback final: match por nome de rubrica
+                                        const matchesRub = productRubRaw.toLowerCase().includes(currentRubRaw.toLowerCase()) || 
+                                                         currentRubRaw.toLowerCase().includes(productRubRaw.toLowerCase());
+                                        
+                                        if (matchesRub && (!productNecRaw || productNecRaw.toLowerCase().includes("geral") || productNecRaw === "TODAS")) return true;
+
+                                        return false;
+                                      });
                                     })().map((prod: any) => (
                                       <option key={prod.nome} value={prod.nome}>
-                                        {prod.nome} — {rubrica.rubrica === "Bens"
-                                          ? `Preço a Definir (${prod.unidade})`
-                                          : `${Number(prod.preco || 0).toLocaleString("pt-MZ", { minimumFractionDigits: 2 })} MZN (${prod.unidade})`}
+                                        {prod.nome} — {Number(prod.preco || 0).toLocaleString("pt-MZ", { minimumFractionDigits: 2 })} MZN ({prod.unidade})
                                       </option>
                                     ))}
                                     <option value="__custom__">Outro produto personalizado (Digitar abaixo)</option>
                                   </select>
-
-                                  {(!PRODUTOS_POR_NECESSIDADE[getCleanNecessidadeKey(rubrica.necessidade)].some(p => p.nome === rubrica.nomeProduto) && rubrica.nomeProduto !== "") || true ? (
-                                    <input
-                                      type="text"
-                                      value={rubrica.nomeProduto || ""}
-                                      disabled={isBlocked}
-                                      placeholder="Ou digite o nome do produto personalizado..."
-                                      onChange={(e) => {
-                                        const val = e.target.value;
-                                        const newRubricas = [...formData.rubricas];
-                                        newRubricas[index] = {
-                                          ...rubrica,
-                                          nomeProduto: val,
-                                        };
-                                        setFormData({
-                                          ...formData,
-                                          rubricas: newRubricas,
-                                        });
-                                      }}
-                                      className="w-full px-4 py-2.5 bg-white border border-blue-900/30 rounded-xl text-[13px] font-bold text-blue-950 outline-none focus:border-blue-900 shadow-sm"
-                                    />
-                                  ) : null}
+                                  <input
+                                    type="text"
+                                    value={rubrica.nomeProduto || ""}
+                                    disabled={isBlocked}
+                                    placeholder="Ou digite o nome do produto..."
+                                    onChange={(e) => {
+                                      const newRubricas = [...formData.rubricas];
+                                      newRubricas[index] = { ...rubrica, nomeProduto: e.target.value };
+                                      setFormData({ ...formData, rubricas: newRubricas });
+                                    }}
+                                    className="w-full px-4 py-3 bg-white border border-blue-900/15 rounded-2xl text-[13px] font-bold text-slate-800 outline-none focus:border-blue-900 transition-all shadow-sm"
+                                  />
                                 </div>
-                                <p className="text-[11px] text-blue-800/70 mt-1.5 italic">
-                                  💡 Cada produto é apresentado na respectiva rubrica e necessidade indicada, permitindo seleção direta ou personalização.
+                                <p className="text-[9px] text-blue-800/60 italic leading-tight mt-1.5 flex items-center gap-1">
+                                  💡 Apenas produtos registados na Gestão de Produtos são listados aqui.
                                 </p>
                               </div>
-                            )}
-                          <div className="grid grid-cols-1 md:grid-cols-6 gap-4 pt-5 border-t border-gray-100 mt-2 items-start">
-                            {/* Nome do Produto */}
-                            <div className="space-y-1">
-                              <label className="block text-[9px] font-black text-blue-900 uppercase tracking-widest ml-2">
-                                {rubrica.rubrica === "Serviços"
-                                  ? "Nome do Serviço"
-                                  : "Nome do Produto"}
-                              </label>
-                              <input
-                                type="text"
-                                list={`past-products-${index}`}
-                                value={rubrica.nomeProduto || ""}
-                                disabled={isBlocked}
-                                onBlur={() => {
-                                  const currentRubrica = formData.rubricas[index];
-                                  if (currentRubrica.nomeProduto && currentRubrica.precoUnitario) {
-                                    collectProductFromRubric(currentRubrica);
-                                  }
-                                }}
-                                onChange={(e) => {
-                                  const val = e.target.value;
-                                  const newRubricas = [...formData.rubricas];
-                                  newRubricas[index] = {
-                                    ...rubrica,
-                                    nomeProduto: val,
-                                  };
 
-                                  // Buscar no mercado e na base unificada
-                                  const marketProds =
-                                    PRODUTOS_POR_NECESSIDADE[
-                                      getCleanNecessidadeKey(rubrica.necessidade)
-                                    ] || [];
-                                  
-                                  const targetNec = (rubrica.necessidade || "").toLowerCase();
-                                  const valLower = (val || "").toLowerCase();
-                                  const unifiedMatched = products.filter(p => 
-                                    (p.necessidade || "").toLowerCase() === targetNec ||
-                                    formatNecessidadeWithCode(p.necessidade || "", p.rubrica).toLowerCase() === targetNec
-                                  );
-
-                                  const foundMarket = marketProds.find(
-                                    (p) =>
-                                      (p.nome || "").toLowerCase() === valLower,
-                                  ) || unifiedMatched.find(
-                                    (p) =>
-                                      (p.nome || "").toLowerCase() === valLower,
-                                  );
-
-                                  if (foundMarket) {
-                                    const isBensRubric =
-                                      rubrica.rubrica === "Bens";
-                                    newRubricas[index] = {
-                                      ...rubrica,
-                                      nomeProduto: foundMarket.nome,
-                                      precoUnitario: (isBensRubric
-                                        ? ""
-                                        : foundMarket.preco) as any,
-                                      detalhes: foundMarket.unidade,
-                                      especificacao: foundMarket.especificacao,
-                                      quantidade: rubrica.quantidade || 1,
-                                      valorTotal: isBensRubric
-                                        ? 0
-                                        : (rubrica.quantidade || 1) *
-                                          foundMarket.preco,
-                                    };
-                                  } else if (val.length >= 3) {
-                                    const pastProductRubric = (plannedActivities || [])
-                                      .flatMap((a) => (a && Array.isArray(a?.rubricas) ? a.rubricas : []))
-                                      .find(
-                                        (r: any) =>
-                                          r &&
-                                          r.nomeProduto &&
-                                          String(r.nomeProduto).toLowerCase() ===
-                                            valLower &&
-                                          r.necessidade === rubrica.necessidade,
-                                      );
-
-                                    if (pastProductRubric) {
-                                      if (
-                                        !newRubricas[index].especificacao &&
-                                        pastProductRubric.especificacao
-                                      )
-                                        newRubricas[index].especificacao =
-                                          pastProductRubric.especificacao;
-                                      if (
-                                        !newRubricas[index].precoUnitario &&
-                                        pastProductRubric.precoUnitario
-                                      )
-                                        newRubricas[index].precoUnitario =
-                                          pastProductRubric.precoUnitario;
-                                      if (
-                                        !newRubricas[index].detalhes &&
-                                        pastProductRubric.detalhes
-                                      )
-                                        newRubricas[index].detalhes =
-                                          pastProductRubric.detalhes;
-                                      newRubricas[index].valorTotal =
-                                        (newRubricas[index].quantidade || 0) *
-                                        (newRubricas[index].precoUnitario || 0);
-                                    }
-                                  }
-
-                                  setFormData({
-                                    ...formData,
-                                    rubricas: newRubricas,
-                                  });
-                                }}
-                                className="w-full px-4 py-2.5 border border-blue-900/20 rounded-full text-[13px] font-bold text-gray-800 outline-none focus:border-blue-900 transition-all shadow-sm bg-white"
-                              />
-                              <datalist id={`past-products-${index}`}>
-                                {(() => {
-                                  const marketNames = (
-                                    PRODUTOS_POR_NECESSIDADE[
-                                      getCleanNecessidadeKey(rubrica.necessidade)
-                                    ] || []
-                                  ).map((p) => p.nome);
-                                  
-                                  const unifiedNames = products
-                                    .filter(p => 
-                                      (p.necessidade || "").toLowerCase() === rubrica.necessidade.toLowerCase() ||
-                                      formatNecessidadeWithCode(p.necessidade || "", p.rubrica).toLowerCase() === rubrica.necessidade.toLowerCase()
-                                    )
-                                    .map(p => p.nome);
-
-                                  const pastNames = plannedActivities
-                                    .flatMap((a) => a.rubricas || [])
-                                    .filter(
-                                      (r: any) =>
-                                        r.necessidade === rubrica.necessidade &&
-                                        r.nomeProduto,
-                                    )
-                                    .map((r: any) => r.nomeProduto);
-                                  const allProducts = Array.from(
-                                    new Set([...marketNames, ...unifiedNames, ...pastNames]),
-                                  ).filter(Boolean);
-                                  return allProducts.map((prod) => (
-                                    <option key={prod} value={prod} />
-                                  ));
-                                })()}
-                              </datalist>
-                            </div>
-
-                            {/* Quantidade */}
-                            <div className="space-y-1">
-                              <label className="block text-[9px] font-black text-blue-900 uppercase tracking-widest ml-2">
-                                {rubrica.rubrica === "Serviços"
-                                  ? "Quantidade de Serviços"
-                                  : "Quantidade de Produtos"}
-                              </label>
-                              <input
-                                type="number"
-                                value={rubrica.quantidade || ""}
-                                disabled={isBlocked}
-                                onChange={(e) => {
-                                  const newRubricas = [...formData.rubricas];
-                                  const qtd = Number(e.target.value);
-                                  const valorTotal =
-                                    qtd * (rubrica.precoUnitario || 0);
-                                  newRubricas[index] = {
-                                    ...rubrica,
-                                    quantidade: qtd,
-                                    valorTotal,
-                                  };
-                                  setFormData({
-                                    ...formData,
-                                    rubricas: newRubricas,
-                                  });
-                                }}
-                                className="w-full px-4 py-2.5 border border-blue-900/20 rounded-full text-[13px] font-bold text-gray-800 outline-none focus:border-blue-900 transition-all shadow-sm bg-white"
-                              />
-                            </div>
-
-                            {/* Preço Unitário */}
-                            <div className="space-y-1">
-                              <label className="block text-[9px] font-black text-blue-900 uppercase tracking-widest ml-2">
-                                Preço unitario (MZN)
-                              </label>
-                              <input
-                                type="number"
-                                value={rubrica.precoUnitario || ""}
-                                disabled={isBlocked}
-                                onBlur={() => {
-                                  const currentRubrica = formData.rubricas[index];
-                                  if (currentRubrica.nomeProduto && currentRubrica.precoUnitario) {
-                                    collectProductFromRubric(currentRubrica);
-                                  }
-                                }}
-                                onChange={(e) => {
-                                  const newRubricas = [...formData.rubricas];
-                                  const preco = Number(e.target.value);
-                                  const valorTotal =
-                                    (rubrica.quantidade || 0) * preco;
-                                  newRubricas[index] = {
-                                    ...rubrica,
-                                    precoUnitario: preco,
-                                    valorTotal,
-                                  };
-                                  setFormData({
-                                    ...formData,
-                                    rubricas: newRubricas,
-                                  });
-                                }}
-                                className="w-full px-4 py-2.5 border border-blue-900/20 rounded-full text-[13px] font-bold text-gray-800 outline-none focus:border-blue-900 transition-all shadow-sm bg-white"
-                              />
-                            </div>
-
-                            {/* Total */}
-                            <div className="space-y-1">
-                              <label className="block text-[9px] font-black text-blue-900 uppercase tracking-widest ml-2">
-                                Total em MZN
-                              </label>
-                              <div className="w-full px-4 py-2.5 bg-[#f4f7fc] border border-blue-900/20 rounded-full text-[13px] font-black text-blue-900 flex items-center justify-center shadow-sm">
-                                {(
-                                  (rubrica.quantidade || 0) *
-                                  (rubrica.precoUnitario || 0)
-                                ).toLocaleString("pt-MZ", {
-                                  minimumFractionDigits: 2,
-                                  maximumFractionDigits: 2,
-                                })}{" "}
-                                MZN
+                              {/* Coluna 2: UNIDADE (1 coluna) */}
+                              <div className="xl:col-span-1 space-y-2.5">
+                                <label className="block text-[10px] font-black text-[#1e3a8a] uppercase tracking-widest mb-1.5">
+                                  DETALHES / UNIDADE
+                                </label>
+                                <select
+                                  value={rubrica.detalhes || "Unidade"}
+                                  disabled={isBlocked}
+                                  onChange={(e) => {
+                                    const newRubricas = [...formData.rubricas];
+                                    newRubricas[index] = { ...rubrica, detalhes: e.target.value };
+                                    setFormData({ ...formData, rubricas: newRubricas });
+                                  }}
+                                  className="w-full px-3 py-3 bg-white border border-blue-900/15 rounded-2xl text-[13px] font-bold text-slate-700 outline-none focus:border-blue-900 transition-all shadow-sm appearance-none"
+                                  style={{
+                                    backgroundImage: `url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%231e3a8a' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3e%3c/svg%3e")`,
+                                    backgroundPosition: "right 0.8rem center",
+                                    backgroundRepeat: "no-repeat",
+                                    backgroundSize: "0.9em 0.9em",
+                                  }}
+                                >
+                                  {["Unidade", "Lote", "Global", "Kit", "Mês", "Trimestre", "Ano", "Kg", "Litro", "Metro", "Resma", "Caixa", "Pacote"].map(opt => (
+                                    <option key={opt} value={opt}>{opt}</option>
+                                  ))}
+                                </select>
                               </div>
-                            </div>
 
-                            {/* Detalhes */}
-                            <div className="space-y-1">
-                              <label className="block text-[9px] font-black text-blue-900 uppercase tracking-widest ml-2">
-                                {rubrica.rubrica === "Serviços"
-                                  ? "Detalhes do Serviço"
-                                  : "Detalhes do Produto"}
-                              </label>
-                              <select
-                                value={rubrica.detalhes || ""}
-                                onBlur={() => {
-                                  const currentRubrica = formData.rubricas[index];
-                                  if (currentRubrica.nomeProduto && currentRubrica.precoUnitario) {
-                                    collectProductFromRubric(currentRubrica);
-                                  }
-                                }}
-                                onChange={(e) => {
-                                  const newRubricas = [...formData.rubricas];
-                                  newRubricas[index] = {
-                                    ...rubrica,
-                                    detalhes: e.target.value,
-                                  };
-                                  setFormData({
-                                    ...formData,
-                                    rubricas: newRubricas,
-                                  });
-                                }}
-                                className="w-full px-4 py-2.5 border border-blue-900/20 rounded-full text-[13px] font-bold text-gray-700 outline-none focus:border-blue-900 transition-all shadow-sm bg-white appearance-none"
-                                style={{
-                                  backgroundImage: `url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%231e3a8a' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3e%3c/svg%3e")`,
-                                  backgroundPosition: "right 1rem center",
-                                  backgroundRepeat: "no-repeat",
-                                  backgroundSize: "1em 1em",
-                                }}
-                              >
-                                <option value="">Selecione...</option>
-                                {(rubrica.rubrica === "Serviços"
-                                  ? [
-                                      "Mês",
-                                      "Hora",
-                                      "Dia",
-                                      "Serviço",
-                                      "Global",
-                                      "Taxa",
-                                    ]
-                                  : [
-                                      "Unidade",
-                                      "Caixa",
-                                      "Caixinha",
-                                      "Embalagem",
-                                      "Litros",
-                                      "Kit",
-                                    ]
-                                ).map((opcao) => (
-                                  <option key={opcao} value={opcao}>
-                                    {opcao}
-                                  </option>
-                                ))}
-                              </select>
-                            </div>
+                              {/* Coluna 3: DESCRIÇÃO / ESPECIFICAÇÃO (4 colunas) */}
+                              <div className="xl:col-span-4 space-y-2.5">
+                                <label className="block text-[10px] font-black text-[#1e3a8a] uppercase tracking-widest mb-1.5">
+                                  DESCRIÇÃO / ESPECIFICAÇÃO
+                                </label>
+                                <textarea
+                                  value={rubrica.especificacao || ""}
+                                  disabled={isBlocked}
+                                  placeholder="Descrição detalhada..."
+                                  onChange={(e) => {
+                                    const newRubricas = [...formData.rubricas];
+                                    newRubricas[index] = { ...rubrica, especificacao: e.target.value };
+                                    setFormData({ ...formData, rubricas: newRubricas });
+                                  }}
+                                  className="w-full p-4 bg-white border border-blue-900/10 rounded-2xl min-h-[110px] text-[12px] font-bold text-slate-700 leading-relaxed shadow-sm outline-none focus:border-blue-900 transition-all"
+                                />
+                              </div>
 
-                            {/* Especificação */}
-                            <div className="space-y-1">
-                              <label className="block text-[9px] font-black text-blue-900 uppercase tracking-widest ml-2">
-                                {rubrica.rubrica === "Serviços"
-                                  ? "Especificacao do Serviço"
-                                  : "Especificacao do Produto"}
-                              </label>
-                              <textarea
-                                value={rubrica.especificacao || ""}
-                                onChange={(e) => {
-                                  const newRubricas = [...formData.rubricas];
-                                  newRubricas[index] = {
-                                    ...rubrica,
-                                    especificacao: e.target.value,
-                                  };
-                                  setFormData({
-                                    ...formData,
-                                    rubricas: newRubricas,
-                                  });
-                                }}
-                                placeholder={
-                                  rubrica.rubrica === "Serviços"
-                                    ? "especificações do serviço..."
-                                    : "especificações técnicas..."
-                                }
-                                className="w-full p-4 border border-blue-900/20 rounded-3xl text-[13px] font-bold text-gray-700 outline-none focus:border-blue-900 transition-all resize-none shadow-sm bg-white min-h-[50px] h-full"
-                              />
+                              {/* Coluna 4: NOME E QUANTIDADE (2 colunas) */}
+                              <div className="xl:col-span-2 space-y-4">
+                                <div className="space-y-1.5">
+                                  <label className="block text-[10px] font-black text-[#1e3a8a] uppercase tracking-widest mb-1">
+                                    NOME DO PRODUTO
+                                  </label>
+                                  <input
+                                    type="text"
+                                    value={rubrica.nomeProduto || ""}
+                                    disabled={isBlocked}
+                                    onChange={(e) => {
+                                      const newRubricas = [...formData.rubricas];
+                                      newRubricas[index] = { ...rubrica, nomeProduto: e.target.value };
+                                      setFormData({ ...formData, rubricas: newRubricas });
+                                    }}
+                                    className="w-full px-4 py-3 bg-white border border-blue-900/15 rounded-2xl text-[13px] font-bold text-slate-800 outline-none focus:border-blue-900 shadow-sm"
+                                  />
+                                </div>
+                                <div className="space-y-1.5">
+                                  <label className="block text-[10px] font-black text-[#1e3a8a] uppercase tracking-widest mb-1">
+                                    QUANTIDADE
+                                  </label>
+                                  <input
+                                    type="number"
+                                    value={rubrica.quantidade || ""}
+                                    disabled={isBlocked}
+                                    onChange={(e) => {
+                                      const newRubricas = [...formData.rubricas];
+                                      const qtd = Number(e.target.value);
+                                      newRubricas[index] = {
+                                        ...rubrica,
+                                        quantidade: qtd,
+                                        valorTotal: qtd * (rubrica.precoUnitario || 0)
+                                      };
+                                      setFormData({ ...formData, rubricas: newRubricas });
+                                    }}
+                                    className="w-full px-4 py-3 bg-white border border-blue-900/15 rounded-2xl text-[13px] font-bold text-slate-800 outline-none focus:border-blue-900 shadow-sm"
+                                  />
+                                </div>
+                              </div>
+
+                              {/* Coluna 5: PREÇO E TOTAL (2 colunas) */}
+                              <div className="xl:col-span-2 grid grid-cols-1 gap-4 bg-white/60 p-5 rounded-[24px] border border-blue-900/10 items-end shadow-sm">
+                                <div className="space-y-1.5">
+                                  <label className="block text-[10px] font-black text-[#1e3a8a] uppercase tracking-widest mb-1">
+                                    PREÇO UNITARIO (MZN)
+                                  </label>
+                                  <input
+                                    type="number"
+                                    value={rubrica.precoUnitario || ""}
+                                    disabled={isBlocked}
+                                    onChange={(e) => {
+                                      const newRubricas = [...formData.rubricas];
+                                      const prc = Number(e.target.value);
+                                      newRubricas[index] = {
+                                        ...rubrica,
+                                        precoUnitario: prc,
+                                        valorTotal: (rubrica.quantidade || 0) * prc
+                                      };
+                                      setFormData({ ...formData, rubricas: newRubricas });
+                                    }}
+                                    className="w-full px-4 py-3 bg-white border border-blue-900/15 rounded-2xl text-[13px] font-bold text-slate-800 outline-none focus:border-blue-900 shadow-sm"
+                                  />
+                                </div>
+                                <div className="space-y-1.5">
+                                  <label className="block text-[10px] font-black text-[#1e3a8a] uppercase tracking-widest mb-1 text-center">
+                                    TOTAL EM MZN
+                                  </label>
+                                  <div className="w-full py-4 px-4 bg-[#eff6ff] border-2 border-blue-200/50 rounded-[20px] text-[15px] font-black text-blue-900 flex items-center justify-center shadow-inner">
+                                    {((rubrica.quantidade || 0) * (rubrica.precoUnitario || 0)).toLocaleString("pt-MZ", { minimumFractionDigits: 2 })} MZN
+                                  </div>
+                                </div>
+                              </div>
                             </div>
                           </div>
 
-                          <div className="mt-4 flex justify-start">
+                          <div className="mt-6 flex justify-start">
                             <button
                               type="button"
                               disabled={isBlocked}
@@ -6096,20 +5934,19 @@ export default function ActivityForm({
                                   id: Date.now() + Math.random(),
                                   rubrica: rubrica.rubrica,
                                   necessidade: rubrica.necessidade,
+                                  quantidade: 1,
+                                  precoUnitario: 0,
+                                  valorTotal: 0
                                 });
-                                setFormData({
-                                  ...formData,
-                                  rubricas: newRubricas,
-                                });
+                                setFormData({ ...formData, rubricas: newRubricas });
                               }}
-                              className="px-6 py-2.5 bg-[#1a365d] text-white rounded-xl text-[13px] font-bold hover:bg-blue-800 transition-all shadow-md flex items-center gap-1"
+                              className="px-8 py-3.5 bg-[#1e3a8a] text-white rounded-2xl text-[13px] font-black hover:bg-blue-900 transition-all shadow-xl hover:shadow-blue-900/20 flex items-center gap-2.5 active:scale-[0.98]"
                             >
-                              {rubrica.rubrica === "Serviços"
-                                ? "+Adicionar serviço"
-                                : "+Adicionar produto"}
+                              <Plus className="w-4.5 h-4.5" />
+                              {rubrica.rubrica === "Serviços" ? "Adicionar serviço" : "Adicionar produto"}
                             </button>
                           </div>
-                        </>
+                        </div>
                       ) : (
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 items-end">
                           <div className="space-y-1">
@@ -6235,54 +6072,7 @@ export default function ActivityForm({
                         </div>
                       )}
                       
-                      {/* Common fields for all rubricas: Especificação and Detalhes */}
-                      <div className="mt-6 grid grid-cols-1 md:grid-cols-2 gap-4 bg-blue-50/30 p-5 rounded-2xl border border-blue-900/10">
-                        <div className="space-y-1.5">
-                          <label className="block text-[11px] font-bold text-blue-900 tracking-tight leading-tight ml-2">
-                            Detalhes / Unidade da Necessidade
-                          </label>
-                          <input
-                            type="text"
-                            value={rubrica.detalhes || ""}
-                            disabled={isBlocked}
-                            onChange={(e) => {
-                              const newRubricas = [...formData.rubricas];
-                              newRubricas[index] = {
-                                ...rubrica,
-                                detalhes: e.target.value,
-                              };
-                              setFormData({
-                                ...formData,
-                                rubricas: newRubricas,
-                              });
-                            }}
-                            placeholder="Ex: Mês, Unidade, Caixa, Reunião, Deslocação..."
-                            className="w-full px-4 py-2.5 border border-blue-900/20 rounded-xl text-[13px] font-bold text-gray-700 outline-none focus:border-blue-900 transition-all shadow-sm bg-white"
-                          />
-                        </div>
-                        <div className="space-y-1.5">
-                          <label className="block text-[11px] font-bold text-blue-900 tracking-tight leading-tight ml-2">
-                            Descrição / Especificação da Necessidade
-                          </label>
-                          <textarea
-                            value={rubrica.especificacao || ""}
-                            disabled={isBlocked}
-                            onChange={(e) => {
-                              const newRubricas = [...formData.rubricas];
-                              newRubricas[index] = {
-                                ...rubrica,
-                                especificacao: e.target.value,
-                              };
-                              setFormData({
-                                ...formData,
-                                rubricas: newRubricas,
-                              });
-                            }}
-                            placeholder="Descreva detalhadamente o serviço ou necessidade..."
-                            className="w-full p-4 border border-blue-900/20 rounded-xl text-[13px] font-bold text-gray-700 outline-none focus:border-blue-900 transition-all resize-none shadow-sm bg-white min-h-[50px] h-full"
-                          />
-                        </div>
-                      </div>
+                      {/* Removido campos redundantes conforme solicitado pelo usuário */}
                     </div>
                     {formData.rubricas.length > 1 && !isCombustivel && (
                       <button
@@ -6424,8 +6214,7 @@ export default function ActivityForm({
                 {totalGeral.toLocaleString("pt-MZ", {
                   minimumFractionDigits: 2,
                   maximumFractionDigits: 2,
-                })}{" "}
-                MZN
+                })} MZN
               </div>
             </div>
 

@@ -161,7 +161,7 @@ export async function getUnifiedProducts(): Promise<UnifiedProduct[]> {
   const map = new Map<string, UnifiedProduct>();
   const deletedKeys = getDeletedProductKeys();
 
-  // 1. Fetch from Firestore (primary source)
+  // 1. Fetch EXCLUSIVELY from Firestore (Gestão de Produtos e Preços)
   try {
     const remoteProducts = await firestoreService.produtosUnificados.get();
     remoteProducts.forEach((p) => {
@@ -188,96 +188,6 @@ export async function getUnifiedProducts(): Promise<UnifiedProduct[]> {
     console.error("Error fetching unified products from Firestore:", e);
   }
 
-  // 2. Merge existing local logic
-  Object.entries(PRODUTOS_POR_NECESSIDADE).forEach(([necessidade, prods]) => {
-    const rubrica = getRubricaForNecessidade(necessidade);
-    prods.forEach((p) => {
-      const singularName = toSingularProductName(p.nome);
-      const key = singularName.trim().toLowerCase();
-      if (!deletedKeys.has(key) && !map.has(key)) {
-        map.set(key, {
-          nome: singularName,
-          preco: p.preco || 0,
-          unidade: p.unidade || "Unidade",
-          especificacao: p.especificacao || "",
-          rubrica: rubrica,
-          necessidade: necessidade,
-          categoria: getCategoryForRubricaOrNecessidade(rubrica, necessidade),
-        });
-      }
-    });
-  });
-
-  // ... (localStorage harvesting logic restored)
-  try {
-    for (let i = 0; i < localStorage.length; i++) {
-      const keyName = localStorage.key(i);
-      if (keyName && (keyName.includes("activities") || keyName.includes("actividades") || keyName.includes("matrix") || keyName.includes("dept"))) {
-        const itemVal = localStorage.getItem(keyName);
-        if (itemVal) {
-          const parsedActs = JSON.parse(itemVal);
-          const actsList = Array.isArray(parsedActs) ? parsedActs : [parsedActs];
-          actsList.forEach((act: any) => {
-            const rubricasArr = act?.rubricas || act?.rubricasOrcamentais || [];
-            if (Array.isArray(rubricasArr)) {
-              rubricasArr.forEach((r: any) => {
-                if (r && r.nomeProduto && r.nomeProduto.trim()) {
-                  const singularName = toSingularProductName(r.nomeProduto);
-                  const pKey = singularName.toLowerCase();
-                  if (!deletedKeys.has(pKey)) {
-                    const existing = map.get(pKey);
-                    const rubrica = r.rubrica || existing?.rubrica || getRubricaForNecessidade(r.necessidade);
-                    const necessidade = r.necessidade || existing?.necessidade || "Geral";
-                    map.set(pKey, {
-                      nome: singularName,
-                      preco: Number(r.precoUnitario || r.preco || existing?.preco) || 0,
-                      unidade: r.detalhes || r.unidade || existing?.unidade || "Unidade",
-                      especificacao: r.especificacao || existing?.especificacao || "",
-                      rubrica: rubrica,
-                      necessidade: necessidade,
-                      categoria: existing?.categoria || getCategoryForRubricaOrNecessidade(rubrica, necessidade),
-                    });
-                  }
-                }
-              });
-            }
-          });
-        }
-      }
-    }
-  } catch (e) {
-    console.error("Error harvesting products from system activities:", e);
-  }
-
-  try {
-    const saved = localStorage.getItem("sigep_unified_products");
-    if (saved) {
-      const parsed: UnifiedProduct[] = JSON.parse(saved);
-      parsed.forEach((p) => {
-        if (p && p.nome) {
-          const singularName = toSingularProductName(p.nome);
-          const key = singularName.trim().toLowerCase();
-          if (!deletedKeys.has(key)) {
-            const existing = map.get(key);
-            const rubrica = p.rubrica || existing?.rubrica || "Bens - 121";
-            const necessidade = p.necessidade || existing?.necessidade || "Geral";
-            map.set(key, {
-              nome: singularName,
-              preco: Number(p.preco) || 0,
-              unidade: p.unidade || existing?.unidade || "Unidade",
-              especificacao: p.especificacao || existing?.especificacao || "",
-              rubrica: rubrica,
-              necessidade: necessidade,
-              categoria: p.categoria || existing?.categoria || getCategoryForRubricaOrNecessidade(rubrica, necessidade),
-              updatedAt: p.updatedAt,
-            });
-          }
-        }
-      });
-    }
-  } catch (e) {
-    console.error("Error loading unified products:", e);
-  }
   const result = Array.from(map.values());
   result.sort((a, b) => a.nome.localeCompare(b.nome, "pt-MZ", { sensitivity: "base" }));
   return result;
