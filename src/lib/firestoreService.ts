@@ -86,231 +86,23 @@ export function isLocalStorageFallbackActive(): boolean {
   return localStorage.getItem("sigep_quota_exceeded") === "true";
 }
 
-const DEFAULT_SEED_ACTIVITIES = [
-  {
-    id: "local_seed_1",
-    codigoAtividade: "1",
-    referencia: "1",
-    designacao:
-      "Aquisição de Reagentes e Vidraria para Laboratório de Engenharia Química",
-    title:
-      "Aquisição de Reagentes e Vidraria para Laboratório de Engenharia Química",
-    unidadeOrganica: "ISPS",
-    direcao: "Gabinete do Diretor-Geral",
-    departamento: "UGEA",
-    setor: "UGEA",
-    reparticao: "UGEA",
-    fonteReceita: "Orçamento do Estado",
-    prioridade: "Alta",
-    objetivo:
-      "Equipar os laboratórios para as aulas práticas do curso de Engenharia Química",
-    provincia: "Tete",
-    distrito: "Songo",
-    responsavel: "SLAITER TRIPAS",
-    trimestre: "I",
-    mes: "Janeiro",
-    frequencia: "Pontual",
-    dataInicio: "2027-01-10",
-    dataFim: "2027-02-15",
-    totalDias: "36",
-    necessidadeTransporte: "Não",
-    rubrica: "311",
-    necessidade: "Aquisição de Reagentes",
-    especificacoes: "Ácido sulfúrico PA, Acetona pura, Béquer de 250ml",
-    numPessoasEnvolvidas: "3",
-    unitario: "1500",
-    ajudaCusto: "0",
-    valorTotal: 4500,
-    ano: 2027,
-    tipoPlano: "plano de aquisição",
-    status: "planificacao",
-  },
-  {
-    id: "local_seed_2",
-    codigoAtividade: "1",
-    referencia: "1",
-    designacao:
-      "Aquisição de Reagentes e Vidraria para Laboratório de Engenharia Química",
-    title:
-      "Aquisição de Reagentes e Vidraria para Laboratório de Engenharia Química",
-    unidadeOrganica: "ISPS",
-    direcao: "Gabinete do Diretor-Geral",
-    departamento: "UGEA",
-    setor: "UGEA",
-    reparticao: "UGEA",
-    fonteReceita: "Orçamento do Estado",
-    prioridade: "Alta",
-    objetivo:
-      "Equipar os laboratórios para as aulas práticas do curso de Engenharia Química",
-    provincia: "Tete",
-    distrito: "Songo",
-    responsavel: "SLAITER TRIPAS",
-    trimestre: "I",
-    mes: "Janeiro",
-    frequencia: "Pontual",
-    dataInicio: "2027-01-10",
-    dataFim: "2027-02-15",
-    totalDias: "36",
-    necessidadeTransporte: "Não",
-    rubrica: "312",
-    necessidade: "Aquisição de Vidraria de Laboratório",
-    especificacoes: "Béqueres, tubos de ensaio, pipetas volumétricas",
-    numPessoasEnvolvidas: "2",
-    unitario: "3500",
-    ajudaCusto: "0",
-    valorTotal: 7000,
-    ano: 2027,
-    tipoPlano: "plano de aquisição",
-    status: "planificacao",
-  },
-  {
-    id: "local_seed_3",
-    codigoAtividade: "2",
-    referencia: "2",
-    designacao:
-      "Elaboração e Publicação do Relatório de Desempenho Institucional (PESOE)",
-    title:
-      "Elaboração e Publicação do Relatório de Desempenho Institucional (PESOE)",
-    unidadeOrganica: "ISPS",
-    direcao: "Gabinete do Diretor-Geral",
-    departamento: "DPEP",
-    setor: "Planificação",
-    reparticao: "Planificação",
-    fonteReceita: "Receitas Próprias",
-    prioridade: "Média",
-    objetivo:
-      "Prestar contas e analisar os resultados físicos e financeiros do ciclo anterior",
-    provincia: "Tete",
-    distrito: "Songo",
-    responsavel: "SLAITER TRIPAS",
-    trimestre: "I",
-    mes: "Fevereiro",
-    frequencia: "Pontual",
-    dataInicio: "2027-02-01",
-    dataFim: "2027-02-28",
-    totalDias: "27",
-    necessidadeTransporte: "Não",
-    rubrica: "324",
-    necessidade: "Serviços de Impressão e Encadernação",
-    especificacoes: "Impressão a laser colorida, 50 cópias do relatório anual",
-    numPessoasEnvolvidas: "4",
-    unitario: "200",
-    ajudaCusto: "0",
-    valorTotal: 800,
-    ano: 2027,
-    tipoPlano: "Setorial",
-    status: "planificacao",
-  },
-  {
-    id: "local_seed_4",
-    codigoAtividade: "3",
-    referencia: "3",
-    designacao:
-      "Manutenção Preventiva das Instalações e Equipamentos de Climatização (AC)",
-    title:
-      "Manutenção Preventiva das Instalações e Equipamentos de Climatização (AC)",
-    unidadeOrganica: "ISPS",
-    direcao: "Direção Administrativa e Financeira",
-    departamento: "DAF",
-    setor: "Manutenção",
-    reparticao: "Manutenção",
-    fonteReceita: "Orçamento do Estado",
-    prioridade: "Alta",
-    objetivo:
-      "Garantir o conforto térmico nas salas de aula e escritórios administrativos",
-    provincia: "Tete",
-    distrito: "Songo",
-    responsavel: "Técnico de Manutenção",
-    trimestre: "II",
-    mes: "Abril",
-    frequencia: "Pontual",
-    dataInicio: "2027-04-05",
-    dataFim: "2027-04-20",
-    totalDias: "15",
-    necessidadeTransporte: "Não",
-    rubrica: "313",
-    necessidade: "Serviço de Limpeza e Reparação de Ar Condicionados",
-    especificacoes:
-      "Recarga de gás refrigerante R410A, limpeza de filtros, reparo de placas",
-    numPessoasEnvolvidas: "3",
-    unitario: "4500",
-    ajudaCusto: "0",
-    valorTotal: 13500,
-    ano: 2027,
-    tipoPlano: "plano de contratação",
-    status: "direcao",
-  },
-  {
-    id: "local_seed_5",
-    codigoAtividade: "1",
-    referencia: "1",
-    designacao: "Supervisão Pedagógica das Aulas Práticas de Campo",
-    title: "Supervisão Pedagógica das Aulas Práticas de Campo",
-    unidadeOrganica: "ISPS",
-    direcao: "Gabinete do Diretor-Geral",
-    departamento: "DPEP",
-    setor: "Planificação",
-    reparticao: "Planificação",
-    fonteReceita: "Orçamento do Estado",
-    prioridade: "Alta",
-    objetivo: "Acompanhar o desempenho didático-pedagógico em campo",
-    provincia: "Tete",
-    distrito: "Songo",
-    responsavel: "SLAITER TRIPAS",
-    trimestre: "I",
-    mes: "Janeiro",
-    frequencia: "Pontual",
-    dataInicio: "2026-01-15",
-    dataFim: "2026-01-30",
-    totalDias: "15",
-    necessidadeTransporte: "Não",
-    rubrica: "311",
-    necessidade: "Ajudas de Custo para Supervisão",
-    especificacoes: "Diárias para equipe técnica de supervisão",
-    numPessoasEnvolvidas: "2",
-    unitario: "1500",
-    ajudaCusto: "3000",
-    valorTotal: 6000,
-    ano: 2026,
-    tipoPlano: "Setorial",
-    status: "planificacao",
-  },
-  {
-    id: "local_seed_6",
-    codigoAtividade: "1",
-    referencia: "1",
-    designacao: "Supervisão Pedagógica das Aulas Práticas de Campo",
-    title: "Supervisão Pedagógica das Aulas Práticas de Campo",
-    unidadeOrganica: "ISPS",
-    direcao: "Gabinete do Diretor-Geral",
-    departamento: "DPEP",
-    setor: "Planificação",
-    reparticao: "Planificação",
-    fonteReceita: "Orçamento do Estado",
-    prioridade: "Alta",
-    objetivo: "Acompanhar o desempenho didático-pedagógico em campo",
-    provincia: "Tete",
-    distrito: "Songo",
-    responsavel: "SLAITER TRIPAS",
-    trimestre: "I",
-    mes: "Janeiro",
-    frequencia: "Pontual",
-    dataInicio: "2026-01-15",
-    dataFim: "2026-01-30",
-    totalDias: "15",
-    necessidadeTransporte: "Não",
-    rubrica: "312",
-    necessidade: "Combustível para Viatura de Apoio",
-    especificacoes: "Litros de diesel para deslocação até ao local",
-    numPessoasEnvolvidas: "1",
-    unitario: "98",
-    ajudaCusto: "0",
-    valorTotal: 4900,
-    ano: 2026,
-    tipoPlano: "Setorial",
-    status: "planificacao",
-  },
-];
+export function isLegacyDemoActivity(item: any): boolean {
+  if (!item) return false;
+  const idStr = String(item.id || "");
+  if (idStr.startsWith("local_seed_")) return true;
+  const des = String(item.designacao || item.title || "");
+  if (
+    des.includes("Laboratório de Engenharia Química") ||
+    des.includes("PESOE") ||
+    des.includes("Climatização (AC)") ||
+    des.includes("Supervisão Pedagógica das Aulas Práticas")
+  ) {
+    return true;
+  }
+  return false;
+}
+
+export const DEFAULT_SEED_ACTIVITIES: any[] = [];
 
 function getLocalData(collectionName: string): any[] {
   try {
@@ -318,7 +110,13 @@ function getLocalData(collectionName: string): any[] {
     const data = localStorage.getItem(key);
     if (data !== null) {
       const parsed = JSON.parse(data);
-      if (Array.isArray(parsed)) return parsed;
+      if (Array.isArray(parsed)) {
+        const filtered = parsed.filter((item: any) => !isLegacyDemoActivity(item));
+        if (filtered.length !== parsed.length) {
+          localStorage.setItem(key, safeJSONStringify(filtered));
+        }
+        return filtered;
+      }
     }
     return [];
   } catch (e) {
@@ -495,28 +293,25 @@ export async function getFromCollection<T>(
     // Add remote data first
     remoteData.forEach((item) => combinedMap.set(item.id, item));
     
-    // Merge local data: if local is newer or is a new local item, prefer local
+    // Merge local data: ONLY merge items that are genuinely new local items (starts with local_) or pending sync
     localData.forEach((localItem) => {
-      if (!localItem.id) return;
-      
-      const existing = combinedMap.get(localItem.id);
+      if (!localItem || !localItem.id) return;
+      if (isLegacyDemoActivity(localItem)) return;
+
       const isLocalNewItem = String(localItem.id).startsWith("local_");
-      
-      if (!existing || isLocalNewItem) {
+      const isPending = localItem.pending_sync === true;
+
+      if (isLocalNewItem) {
         combinedMap.set(localItem.id, localItem);
-      } else {
-        // Compare timestamps to keep the newest version
-        const remoteUpdate = existing.updatedAt || existing.createdAt || 0;
-        const localUpdate = localItem.updatedAt || localItem.createdAt || 0;
-        
-        // If local is strictly newer, use it
-        if (new Date(localUpdate) > new Date(remoteUpdate)) {
-          combinedMap.set(localItem.id, localItem);
+      } else if (isPending) {
+        const existing = combinedMap.get(localItem.id);
+        if (existing) {
+          combinedMap.set(localItem.id, { ...existing, ...localItem });
         }
       }
     });
 
-    const combinedData = Array.from(combinedMap.values());
+    const combinedData = Array.from(combinedMap.values()).filter((it) => !isLegacyDemoActivity(it));
     saveLocalData(collectionName, combinedData);
     return combinedData as (T & { id: string })[];
   } catch (error: any) {
@@ -565,24 +360,25 @@ export function subscribeToCollection<T>(
             // Add remote data
             remoteData.forEach((item) => combinedMap.set(item.id, item));
 
-            // Merge local data
+            // Merge local data: ONLY merge items that are genuinely new local items (starts with local_) or pending sync
             localData.forEach((localItem) => {
-              if (!localItem.id) return;
-              const existing = combinedMap.get(localItem.id);
-              const isLocalNewItem = String(localItem.id).startsWith("local_");
+              if (!localItem || !localItem.id) return;
+              if (isLegacyDemoActivity(localItem)) return;
 
-              if (!existing || isLocalNewItem) {
+              const isLocalNewItem = String(localItem.id).startsWith("local_");
+              const isPending = localItem.pending_sync === true;
+
+              if (isLocalNewItem) {
                 combinedMap.set(localItem.id, localItem);
-              } else {
-                const remoteUpdate = existing.updatedAt || existing.createdAt || 0;
-                const localUpdate = localItem.updatedAt || localItem.createdAt || 0;
-                if (new Date(localUpdate) > new Date(remoteUpdate)) {
-                  combinedMap.set(localItem.id, localItem);
+              } else if (isPending) {
+                const existing = combinedMap.get(localItem.id);
+                if (existing) {
+                  combinedMap.set(localItem.id, { ...existing, ...localItem });
                 }
               }
             });
 
-            const combinedData = Array.from(combinedMap.values());
+            const combinedData = Array.from(combinedMap.values()).filter((it) => !isLegacyDemoActivity(it));
             saveLocalData(collectionName, combinedData);
             
             try {
@@ -845,6 +641,11 @@ export async function resequenceActivitiesAfterDelete(
 
 export async function syncAllLocalData() {
   const collectionsToSync = [
+    "matrix_activities",
+    "actividades",
+    "colaboradores",
+    "colaboradores_chefia",
+    "users",
     "colaboradores_formacao",
     "archive_documents",
     "configuracoes",
@@ -857,10 +658,6 @@ export async function syncAllLocalData() {
     "library_books",
     "service_requests",
     "suppliers",
-    "matrix_activities",
-    "colaboradores",
-    "colaboradores_chefia",
-    "actividades",
     "bolsas",
     "atendimentos_estudantis",
     "processos_individuais",
@@ -875,7 +672,6 @@ export async function syncAllLocalData() {
     "espacos_fisicos",
     "turmas",
     "disciplinas_academicas",
-    "users",
     "access_alerts",
     "monografia",
     "institucional_plans",
@@ -887,16 +683,20 @@ export async function syncAllLocalData() {
     "balanco_config",
   ];
 
-  console.log("🔄 Iniciando sincronização de dados locais com o Firestore...");
+  console.log("🔄 Iniciando sincronização de dados locais com a nuvem (Firestore)...");
   let syncedCount = 0;
 
   for (const colName of collectionsToSync) {
     const localData = getLocalData(colName);
     if (!localData || localData.length === 0) continue;
 
+    let updatedLocalList = [...localData];
+    let listChanged = false;
+
     // Filter items that strictly need syncing: starting with local_ OR having pending_sync flag
     for (const item of localData) {
-      if (!item.id) continue;
+      if (!item || !item.id) continue;
+      if (String(item.id).startsWith("local_seed_")) continue;
 
       const isLocalNew = String(item.id).startsWith("local_");
       const isPending = item.pending_sync === true;
@@ -905,31 +705,105 @@ export async function syncAllLocalData() {
 
       try {
         if (isLocalNew) {
-          // It's a new item, add it and get a real ID
-          const { id, pending_sync, ...dataToSave } = item;
-          const newId = await addToCollection(colName, dataToSave);
-          if (newId && !newId.startsWith("local_")) {
-            syncedCount++;
-          }
-        } else {
-          // It's an existing item with pending updates, update it
+          // Remove local ID and temporary sync flags
+          const { id: oldLocalId, pending_sync, ...dataToSave } = item;
+          
+          const docRef = await addDoc(collection(db, colName), {
+            ...cleanObject(dataToSave),
+            userId: auth.currentUser?.uid || dataToSave.userId || null,
+            tenantId: "ISPS",
+            createdAt: serverTimestamp(),
+            updatedAt: serverTimestamp(),
+            synced: true,
+          });
+
+          const newFirestoreId = docRef.id;
+          console.log(`☁️ Item sincronizado com a nuvem: ${colName}/${newFirestoreId} (anterior: ${oldLocalId})`);
+
+          // Substituir no array local pelo ID definitivo do Firestore
+          updatedLocalList = updatedLocalList.filter((x) => x.id !== oldLocalId);
+          updatedLocalList.push({
+            ...dataToSave,
+            id: newFirestoreId,
+            updatedAt: new Date().toISOString(),
+            synced: true,
+          });
+          listChanged = true;
+          syncedCount++;
+        } else if (isPending) {
           const { pending_sync, ...dataToSave } = item;
-          await updateInCollection(colName, item.id, dataToSave);
+          const docRef = doc(db, colName, item.id);
+          await setDoc(
+            docRef,
+            {
+              ...cleanObject(dataToSave),
+              updatedAt: serverTimestamp(),
+              synced: true,
+            },
+            { merge: true }
+          );
+
+          const idx = updatedLocalList.findIndex((x) => x.id === item.id);
+          if (idx !== -1) {
+            delete updatedLocalList[idx].pending_sync;
+            updatedLocalList[idx].synced = true;
+            listChanged = true;
+          }
           syncedCount++;
         }
       } catch (err) {
-        // Silent fail for individual items, will retry next time
+        console.warn(`Aviso na sincronização de ${colName}/${item.id}:`, err);
       }
+    }
+
+    if (listChanged) {
+      saveLocalData(colName, updatedLocalList);
     }
   }
 
   if (syncedCount > 0) {
-    console.log(`✅ Sincronização concluída: ${syncedCount} itens processados.`);
+    console.log(`✅ Sincronização em nuvem concluída: ${syncedCount} itens salvos no Firestore.`);
     localStorage.removeItem("sigep_quota_exceeded");
   } else {
-    console.log("Sincronização concluída: nenhum dado pendente encontrado.");
+    console.log("Sincronização em nuvem: todos os dados estão em dia.");
   }
 }
+
+export const ensureCloudDataInitialized = async () => {
+  try {
+    console.log("☁️ Verificando persistência universal no Firestore...");
+    
+    // Limpar quaisquer itens residuais de demonstração do LocalStorage
+    try {
+      const keysToClean = [
+        "sigep_local_matrix_activities",
+        "sigep_local_actividades",
+        "sigep_matrix_activities",
+        "sigep_actividades"
+      ];
+      for (const k of keysToClean) {
+        const raw = localStorage.getItem(k);
+        if (raw) {
+          const parsed = JSON.parse(raw);
+          if (Array.isArray(parsed)) {
+            const cleaned = parsed.filter((item: any) => !isLegacyDemoActivity(item));
+            localStorage.setItem(k, safeJSONStringify(cleaned));
+          }
+        }
+      }
+    } catch (_) {}
+
+    const snap = await getDocs(collection(db, "matrix_activities"));
+    console.log(`☁️ Nuvem conectada: ${snap.size} atividades presentes no Firestore.`);
+
+    // Sincronizar todos os outros dados locais
+    await syncAllLocalData();
+    return { success: true, count: snap.size };
+  } catch (e) {
+    console.warn("Aviso ao garantir inicialização na nuvem:", e);
+    return { success: false, error: e };
+  }
+};
 
 export const firestoreService = {
   subscribeToDocument,
@@ -939,6 +813,7 @@ export const firestoreService = {
   deleteDocument: deleteFromCollection,
   resequenceActivitiesAfterDelete,
   syncAllLocalData,
+  ensureCloudDataInitialized,
   colaboradores_formacao: createCollectionService<any>(
     "colaboradores_formacao",
   ),

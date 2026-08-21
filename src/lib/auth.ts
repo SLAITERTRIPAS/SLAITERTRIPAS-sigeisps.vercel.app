@@ -130,6 +130,19 @@ export const getAuthorizedActivities = (activities: any[], user: any) => {
   if (!activities) return [];
   if (!user) return activities;
 
+  // Se o usuário não tem email ou é uma sessão anônima/pública sem restrição definida,
+  // exibe as atividades institucionais/gerais para não deixar a tela em branco em novos computadores
+  const uEmail = String(user.email || "").toLowerCase().trim();
+  const uDept = String(user.departamento || "").toLowerCase().trim();
+  const uSector = String(user.setor || user.reparticao || "").toLowerCase().trim();
+  const uDir = String(user.direcao || "").toLowerCase().trim();
+  const uRole = String(user.role || "").toLowerCase().trim();
+  const uId = user.uid || user.id;
+
+  if (!uEmail && !uDept && !uSector && !uDir && (uRole === "utilizador" || uRole === "" || !user.role)) {
+    return activities;
+  }
+
   if (isSuperBossUser(user)) return activities;
 
   const role = (user.role || "").toLowerCase();
@@ -142,12 +155,6 @@ export const getAuthorizedActivities = (activities: any[], user: any) => {
     role === "proprietário" ||
     user.isOwner === true ||
     (user.categoria || "").toLowerCase().includes("programador");
-
-  const uEmail = String(user.email || "").toLowerCase();
-  const uId = user.uid || user.id;
-  const uDept = String(user.departamento || "").toLowerCase().trim();
-  const uSector = String(user.setor || user.reparticao || "").toLowerCase().trim();
-  const uDir = String(user.direcao || "").toLowerCase().trim();
 
   return activities.filter((a) => {
     if (!a) return false;
@@ -173,37 +180,51 @@ export const getAuthorizedActivities = (activities: any[], user: any) => {
     const aDeptLower = aDept.toLowerCase();
     const aSectorLower = aSector.toLowerCase();
 
-    // STRICT DEPARTMENTAL PRIVACY:
-    // If NOT a SuperBoss/Admin/DPEP, user can ONLY see their own department's budget/activities
-    const isDPEP = getUserRequiredStatusLevel(user) === 5;
-    const isSameDeptOrSector = 
-      (uDept && aDeptLower && (aDeptLower.includes(uDept) || uDept.includes(aDeptLower))) ||
-      (uSector && aSectorLower && (aSectorLower.includes(uSector) || uSector.includes(aSectorLower)));
+    // STRICT PRIVACY PER LEVEL (Setor, Repartição, Departamento, Direção):
+    // Cada nível só vê as atividades e orçamento por si planificados (ou da sua jurisdição), a não ser que seja explicitamente partilhado.
+    const isDPEP = getUserRequiredStatusLevel(user) === 5 || isSuperBossUser(user);
 
     if (!isSuperBossUser(user) && !isDPEP && !isSysAdmin) {
-      // Se não for chefe/diretor, vê APENAS o que ele próprio criou (conforme pedido pelo utilizador)
       const userRoleStr = (user.title || user.cargo || user.cargoChefia || "").toLowerCase();
       const userRoles = getRoles(userRoleStr);
-      const isBoss = userRoles.isBoss || userRoles.isDG || userRoles.isDC || userRoles.isCD || userRoles.isCR;
 
-      if (!isBoss) {
-        // Usuário comum: apenas o que ele criou
-        const isCreator = (creator && creator === uEmail) || (a.userId && uId && a.userId === uId);
-        if (!isCreator) return false;
+      // Diretor de Direção: vê apenas o que pertence à sua Direção (ou partilhado)
+      if (userRoles.isDC && uDir) {
+        const matchesDir = canAccessArea(user, aDir, aDept, aSector) ||
+          (aDir && (aDir.toLowerCase().includes(uDir) || uDir.includes(aDir.toLowerCase())));
+        if (!matchesDir) return false;
+        return true;
       }
 
-      if (!isSameDeptOrSector) {
-        // If not from the same department, check if it was specifically forwarded to this user/area
-        if (a.currentGabinete) {
-          const uArea = String(user.setor || user.reparticao || user.departamento || user.direcao || "").toLowerCase().trim();
-          const aGabinete = String(a.currentGabinete).toLowerCase();
-          if (uArea && (aGabinete.includes(uArea) || uArea.includes(aGabinete))) return true;
-        }
-        return false; // BLOQUEIO ESTRITO: Não vê nada fora do departamento
+      // Chefe de Departamento: vê apenas o que pertence ao seu Departamento / Repartições sob sua alçada (ou partilhado)
+      if (userRoles.isCD && uDept) {
+        const matchesDept = canAccessArea(user, aDir, aDept, aSector) ||
+          (aDeptLower && (aDeptLower.includes(uDept) || uDept.includes(aDeptLower)));
+        if (!matchesDept) return false;
+        return true;
       }
+
+      // Chefe de Repartição: vê apenas o que pertence à sua Repartição / Setores sob sua alçada (ou partilhado)
+      if (userRoles.isCR && uSector) {
+        const matchesSector = (aSectorLower && (aSectorLower.includes(uSector) || uSector.includes(aSectorLower))) ||
+          canAccessArea(user, aDir, aDept, aSector);
+        if (!matchesSector) return false;
+        return true;
+      }
+
+      // Utilizador / Técnico de Setor comum: vê apenas as atividades que ele próprio planificou (ou partilhadas / do seu setor exato)
+      const isCreator = (creator && creator === uEmail) || (a.userId && uId && a.userId === uId);
+      if (isCreator) return true;
+
+      if (uSector && aSectorLower && (aSectorLower === uSector || aSectorLower.includes(uSector))) {
+        return true;
+      }
+
+      // Se não for criador nem do setor exato e não estiver partilhado: bloqueia
+      return false;
     }
 
-    // Se o utilizador tem permissão/jurisdição sobre a área (mesmo departamento/direção/curso), deve ver a atividade!
+    // Para Planificação, Super Admin e Diretor-Geral (ou atividades da jurisdição direta)
     if (canAccessArea(user, aDir, aDept, aSector)) {
       return true;
     }

@@ -168,7 +168,7 @@ export default function DICOSSEROverview({
     });
   }, [matrixActivities]);
 
-  const totalAtividadesPlanificadas = atividadesDICOSSER.length || 18;
+  const totalAtividadesPlanificadas = atividadesDICOSSER.length;
   const orcamentoTotalProposto = useMemo(() => {
     if (atividadesDICOSSER.length > 0) {
       return atividadesDICOSSER.reduce((acc, act) => {
@@ -176,45 +176,38 @@ export default function DICOSSEROverview({
           parseFloat(act.orcamentoProposto) ||
           parseFloat(act.orcamento) ||
           parseFloat(act.valorTotal) ||
+          parseFloat(act.valor) ||
           0;
         return acc + val;
       }, 0);
     }
-    return 4850000; // 4.850.000,00 MZN valor orçamental de referência
+    return 0;
   }, [atividadesDICOSSER]);
 
   const planosPorDepartamento = useMemo(() => {
-    const deps = [
-      { nome: "Departamento de Registo Académico", atividades: 7, orcamento: 1950000 },
-      { nome: "Departamento de Assuntos Estudantis", atividades: 6, orcamento: 1800000 },
-      { nome: "Departamento de Biblioteca", atividades: 5, orcamento: 1100000 },
+    return [
+      {
+        nome: "Departamento de Registo Académico",
+        atividades: atividadesDICOSSER.filter((a) => (a.departamento || "").toUpperCase().includes("REGISTO")).length,
+        orcamento: atividadesDICOSSER
+          .filter((a) => (a.departamento || "").toUpperCase().includes("REGISTO"))
+          .reduce((s, a) => s + (parseFloat(a.orcamentoProposto || a.orcamento || a.valorTotal || a.valor) || 0), 0),
+      },
+      {
+        nome: "Departamento de Assuntos Estudantis",
+        atividades: atividadesDICOSSER.filter((a) => (a.departamento || "").toUpperCase().includes("ESTUDANTIS")).length,
+        orcamento: atividadesDICOSSER
+          .filter((a) => (a.departamento || "").toUpperCase().includes("ESTUDANTIS"))
+          .reduce((s, a) => s + (parseFloat(a.orcamentoProposto || a.orcamento || a.valorTotal || a.valor) || 0), 0),
+      },
+      {
+        nome: "Departamento de Biblioteca",
+        atividades: atividadesDICOSSER.filter((a) => (a.departamento || "").toUpperCase().includes("BIBLIOTECA")).length,
+        orcamento: atividadesDICOSSER
+          .filter((a) => (a.departamento || "").toUpperCase().includes("BIBLIOTECA"))
+          .reduce((s, a) => s + (parseFloat(a.orcamentoProposto || a.orcamento || a.valorTotal || a.valor) || 0), 0),
+      },
     ];
-    if (atividadesDICOSSER.length > 0) {
-      return [
-        {
-          nome: "Departamento de Registo Académico",
-          atividades: atividadesDICOSSER.filter((a) => (a.departamento || "").toUpperCase().includes("REGISTO")).length || 6,
-          orcamento: atividadesDICOSSER
-            .filter((a) => (a.departamento || "").toUpperCase().includes("REGISTO"))
-            .reduce((s, a) => s + (parseFloat(a.orcamentoProposto || a.orcamento) || 0), 0) || 1950000,
-        },
-        {
-          nome: "Departamento de Assuntos Estudantis",
-          atividades: atividadesDICOSSER.filter((a) => (a.departamento || "").toUpperCase().includes("ESTUDANTIS")).length || 5,
-          orcamento: atividadesDICOSSER
-            .filter((a) => (a.departamento || "").toUpperCase().includes("ESTUDANTIS"))
-            .reduce((s, a) => s + (parseFloat(a.orcamentoProposto || a.orcamento) || 0), 0) || 1800000,
-        },
-        {
-          nome: "Departamento de Biblioteca",
-          atividades: atividadesDICOSSER.filter((a) => (a.departamento || "").toUpperCase().includes("BIBLIOTECA")).length || 4,
-          orcamento: atividadesDICOSSER
-            .filter((a) => (a.departamento || "").toUpperCase().includes("BIBLIOTECA"))
-            .reduce((s, a) => s + (parseFloat(a.orcamentoProposto || a.orcamento) || 0), 0) || 1100000,
-        },
-      ];
-    }
-    return deps;
   }, [atividadesDICOSSER]);
 
   // -------------------------------------------------------------

@@ -26,6 +26,8 @@ import {
   ClipboardList,
   ShoppingCart,
   Box,
+  ChevronLeft,
+  ChevronRight,
 } from "lucide-react";
 
 import BoardOverview from "../bloco2_orgaos_gestao/BoardOverview";
@@ -191,6 +193,8 @@ export default function DirectorDashboard({
                   : "Visão Geral"),
   );
 
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
+
   React.useEffect(() => {
     if (initialActiveItem) {
       setActiveItem(initialActiveItem);
@@ -344,7 +348,7 @@ export default function DirectorDashboard({
     // Standard baseline for all sectors according to requirement
     const baseItems = [
       { title: "Visão Geral", icon: LayoutGrid },
-      { title: "Plano", icon: FileText },
+      { title: isDPEP ? "Gestão de Planos" : "Plano", icon: FileText },
       { title: "Ação Orçamental", icon: DollarSign },
       { title: "Calendário", icon: Calendar },
       { title: "Caixa de Mensagens", icon: MessageSquare },
@@ -910,6 +914,7 @@ export default function DirectorDashboard({
     }
 
     if (
+      activeItem === "Gestão de Planos" ||
       activeItem === "Matriz" ||
       activeItem === "Plano" ||
       activeItem === "Plano de Actividades" ||
@@ -1189,10 +1194,26 @@ export default function DirectorDashboard({
   };
 
   return (
-    <div className="flex h-full bg-gray-50 flex-col md:flex-row overflow-hidden font-sans">
-      <div className="w-full md:w-64 bg-slate-900 text-white flex flex-row md:flex-col p-2 md:p-4 shadow-xl overflow-x-auto md:overflow-y-auto shrink-0 gap-2 md:gap-0 z-20 no-scrollbar">
+    <div className="flex h-full bg-gray-50 flex-col md:flex-row overflow-hidden font-sans relative">
+      <div
+        className={`bg-slate-900 text-white flex flex-row md:flex-col shadow-xl shrink-0 gap-2 md:gap-0 z-20 transition-all duration-300 relative ${
+          isSidebarCollapsed
+            ? "w-full md:w-16 p-2 md:p-2 overflow-x-auto md:overflow-y-auto no-scrollbar"
+            : "w-full md:w-64 p-2 md:p-4 overflow-x-auto md:overflow-y-auto no-scrollbar"
+        }`}
+      >
+        {/* Botão de minimização/maximização centrado no limite entre o submenu lateral e a área de trabalho */}
+        <button
+          type="button"
+          onClick={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
+          title={isSidebarCollapsed ? "Maximizar Menu Lateral" : "Minimizar Menu Lateral"}
+          className="hidden md:flex absolute top-1/2 -translate-y-1/2 -right-3.5 z-40 w-7 h-7 bg-white text-slate-900 hover:bg-blue-600 hover:text-white rounded-full border-2 border-slate-300 hover:border-blue-600 shadow-xl items-center justify-center transition-all duration-300 transform hover:scale-110 focus:outline-none cursor-pointer"
+        >
+          {isSidebarCollapsed ? <ChevronRight size={16} /> : <ChevronLeft size={16} />}
+        </button>
+
         <div className="flex-1 flex flex-row md:flex-col space-y-0 md:space-y-2 gap-2 md:gap-0 min-w-max md:min-w-0">
-          {isDPEP && (
+          {isDPEP && !isSidebarCollapsed && (
             <div className="hidden md:block mb-4 px-3">
               <h3 className="text-amber-500 font-black text-[11px] tracking-[0.2em] uppercase border-b border-slate-700/50 pb-2">
                 Gestão de Plano
@@ -1204,10 +1225,14 @@ export default function DirectorDashboard({
               key={item.title}
               onClick={() => navigateTo(item.title)}
               title={item.title}
-              className={`w-auto md:w-full flex flex-none items-center gap-3 p-2 md:p-3 rounded-xl transition-colors text-left ${activeItem === item.title ? "bg-slate-800 text-white font-bold" : "hover:bg-slate-800 text-slate-300"}`}
+              className={`w-auto md:w-full flex flex-none items-center gap-3 p-2 md:p-3 rounded-xl transition-all text-left ${
+                isSidebarCollapsed ? "md:justify-center md:p-2.5" : ""
+              } ${activeItem === item.title ? "bg-slate-800 text-white font-bold" : "hover:bg-slate-800 text-slate-300"}`}
             >
               <item.icon size={20} className="shrink-0" />
-              <span className="text-xs md:text-sm whitespace-nowrap md:whitespace-normal">{item.title}</span>
+              {!isSidebarCollapsed && (
+                <span className="text-xs md:text-sm whitespace-nowrap md:whitespace-normal">{item.title}</span>
+              )}
             </button>
           ))}
         </div>

@@ -256,7 +256,7 @@ export default function CentralOverview({
     });
   }, [matrixActivities, titleUpper, isDICOSSER, isDICOSAFA, isEngenharia, isCIE]);
 
-  const totalAtividadesPlanificadas = atividadesUnidade.length || (isEngenharia ? 22 : isDICOSAFA ? 25 : isCIE ? 12 : 18);
+  const totalAtividadesPlanificadas = atividadesUnidade.length;
   const orcamentoTotalProposto = useMemo(() => {
     if (atividadesUnidade.length > 0) {
       return atividadesUnidade.reduce((acc, act) => {
@@ -264,12 +264,13 @@ export default function CentralOverview({
           parseFloat(act.orcamentoProposto) ||
           parseFloat(act.orcamento) ||
           parseFloat(act.valorTotal) ||
+          parseFloat(act.valor) ||
           0;
         return acc + val;
       }, 0);
     }
-    return isEngenharia ? 6200000 : isDICOSAFA ? 8500000 : isCIE ? 3100000 : 4850000;
-  }, [atividadesUnidade, isEngenharia, isDICOSAFA, isCIE]);
+    return 0;
+  }, [atividadesUnidade]);
 
   // -------------------------------------------------------------
   // 4. RELATÓRIOS

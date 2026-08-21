@@ -51,6 +51,26 @@ export function toSentenceCase(text: string): string {
   return text.charAt(0).toUpperCase() + text.slice(1).toLowerCase();
 }
 
+export function isPlainObject(val: any): boolean {
+  if (val === null || typeof val !== "object") return false;
+  if (Array.isArray(val)) return false;
+  if (val instanceof Date) return false;
+  
+  try {
+    const proto = Object.getPrototypeOf(val);
+    if (proto === null) return true;
+    if (proto !== Object.prototype) return false;
+    
+    const ctor = val.constructor;
+    if (ctor === undefined) return true;
+    if (typeof ctor !== "function") return false;
+    
+    return ctor === Object;
+  } catch (e) {
+    return false;
+  }
+}
+
 export function sanitizeForJSON(obj: any, seen = new WeakSet()): any {
   if (obj === null || obj === undefined) return obj;
   const type = typeof obj;
@@ -58,68 +78,63 @@ export function sanitizeForJSON(obj: any, seen = new WeakSet()): any {
   if (type === "bigint") return obj.toString();
   if (type === "function" || type === "symbol") return undefined;
 
-  // Global Check for DOM / React / Event / Class instance / Image / Firebase Internal
-  if (
-    (typeof Node !== "undefined" && obj instanceof Node) ||
-    (typeof Window !== "undefined" && obj instanceof Window) ||
-    (typeof Event !== "undefined" && obj instanceof Event) ||
-    obj.nodeType ||
-    obj.$$typeof ||
-    obj.nativeEvent ||
-    (obj.src && typeof obj.src !== "string") ||
-    (obj.constructor && 
-     obj.constructor !== Object && 
-     obj.constructor !== Array && 
-     obj.constructor.name && 
-     obj.constructor.name !== "Object" && 
-     obj.constructor.name !== "Array" &&
-     // Aggressive filter for any minified or internal constructor
-     (obj.constructor.name.length <= 3 || 
-      obj.constructor.name.includes("Firebase") || 
-      obj.constructor.name.includes("Firestore") || 
-      obj.constructor.name.includes("Auth")))
-  ) {
-    // If it's a Firestore Timestamp, we want its value
-    if (typeof obj.toDate === "function") {
-      try { return obj.toDate().toISOString(); } catch (e) { return null; }
-    }
-    return undefined;
-  }
-
-  // Firestore DocumentReference / Query / Firestore instance / Firebase Auth User
-  if (obj._firestore || obj.firestore || obj._delegate || obj.auth) {
-    if (obj.path) return obj.path;
-    if (obj.id) return obj.id;
-    if (obj.uid) return { uid: obj.uid, email: obj.email };
-    return undefined;
-  }
-
   if (type === "object") {
     if (seen.has(obj)) {
       return undefined;
     }
     seen.add(obj);
 
-    if (Array.isArray(obj)) {
-      return obj
-        .map((item) => sanitizeForJSON(item, seen))
-        .filter((item) => item !== undefined);
-    }
-
-    const cleanObj: Record<string, any> = {};
-    for (const key of Object.keys(obj)) {
-      if (key.startsWith("_") && key !== "_id") continue;
-      try {
-        const val = obj[key];
-        const sanitized = sanitizeForJSON(val, seen);
-        if (sanitized !== undefined) {
-          cleanObj[key] = sanitized;
-        }
-      } catch (e) {
-        // Ignorar propriedades inacessiveis
+    try {
+      if (obj instanceof Date) {
+        return isNaN(obj.getTime()) ? null : obj.toISOString();
       }
+
+      if (typeof obj.toDate === "function") {
+        try { return obj.toDate().toISOString(); } catch (e) { return null; }
+      }
+
+      if (Array.isArray(obj)) {
+        return obj
+          .map((item) => sanitizeForJSON(item, seen))
+          .filter((item) => item !== undefined);
+      }
+
+      if (!isPlainObject(obj)) {
+        if (typeof obj.path === "string" || typeof obj.path === "number") return String(obj.path);
+        if (typeof obj.id === "string" || typeof obj.id === "number") return String(obj.id);
+        if (typeof obj.uid === "string" || typeof obj.uid === "number") return { uid: String(obj.uid), email: String(obj.email || "") };
+        return undefined;
+      }
+
+      // Extra check for React / DOM / Event objects
+      if (
+        (typeof Node !== "undefined" && obj instanceof Node) ||
+        (typeof Window !== "undefined" && obj instanceof Window) ||
+        (typeof Event !== "undefined" && obj instanceof Event) ||
+        obj.nodeType ||
+        obj.$$typeof ||
+        obj.nativeEvent
+      ) {
+        return undefined;
+      }
+
+      const cleanObj: Record<string, any> = {};
+      for (const key of Object.keys(obj)) {
+        if (key.startsWith("_") && key !== "_id") continue;
+        try {
+          const val = obj[key];
+          const sanitized = sanitizeForJSON(val, seen);
+          if (sanitized !== undefined) {
+            cleanObj[key] = sanitized;
+          }
+        } catch (e) {
+          // Ignore inaccessible properties/getters
+        }
+      }
+      return cleanObj;
+    } catch (err) {
+      return undefined;
     }
-    return cleanObj;
   }
 
   return String(obj);
@@ -136,37 +151,42 @@ export const getCircularReplacer = () => {
       return undefined;
     }
     if (typeof value === "object") {
-      // Aggressive check for non-plain objects
-      if (
-        (typeof Node !== "undefined" && value instanceof Node) ||
-        (typeof Window !== "undefined" && value instanceof Window) ||
-        (typeof Event !== "undefined" && value instanceof Event) ||
-        value.nodeType ||
-        value.$$typeof ||
-        value.nativeEvent ||
-        (value.src && typeof value.src !== "string") ||
-        (value.constructor && 
-         value.constructor !== Object && 
-         value.constructor !== Array && 
-         value.constructor.name && 
-         value.constructor.name !== "Object" && 
-         value.constructor.name !== "Array" &&
-         (value.constructor.name.length <= 3 || 
-          value.constructor.name.includes("Firebase") || 
-          value.constructor.name.includes("Firestore") || 
-          value.constructor.name.includes("Auth")))
-      ) {
-        if (typeof value.toDate === "function") {
-          try { return value.toDate().toISOString(); } catch (e) { return null; }
-        }
-        if (value.path) return String(value.path);
-        if (value.id) return String(value.id);
-        return undefined;
-      }
       if (seen.has(value)) {
         return undefined;
       }
       seen.add(value);
+
+      try {
+        if (value instanceof Date) {
+          return isNaN(value.getTime()) ? null : value.toISOString();
+        }
+        if (typeof value.toDate === "function") {
+          try { return value.toDate().toISOString(); } catch (e) { return null; }
+        }
+
+        if (Array.isArray(value)) {
+          return value;
+        }
+
+        if (!isPlainObject(value)) {
+          if (typeof value.path === "string" || typeof value.path === "number") return String(value.path);
+          if (typeof value.id === "string" || typeof value.id === "number") return String(value.id);
+          return undefined;
+        }
+
+        if (
+          (typeof Node !== "undefined" && value instanceof Node) ||
+          (typeof Window !== "undefined" && value instanceof Window) ||
+          (typeof Event !== "undefined" && value instanceof Event) ||
+          value.nodeType ||
+          value.$$typeof ||
+          value.nativeEvent
+        ) {
+          return undefined;
+        }
+      } catch (err) {
+        return undefined;
+      }
     }
     return value;
   };
@@ -180,13 +200,20 @@ export function safeJSONStringify(
   try {
     const cleanObj = sanitizeForJSON(obj);
     if (typeof replacer === "function") {
-      return JSON.stringify(cleanObj, replacer, space);
+      return JSON.stringify(cleanObj, (key, value) => {
+        try {
+          return replacer(key, value);
+        } catch (e) {
+          return undefined;
+        }
+      }, space);
     }
     return JSON.stringify(cleanObj, getCircularReplacer(), space);
   } catch (err) {
     console.warn("safeJSONStringify fallback:", err);
     try {
-      return JSON.stringify(String(obj));
+      const fallbackClean = sanitizeForJSON(obj, new WeakSet());
+      return JSON.stringify(fallbackClean, getCircularReplacer(), space);
     } catch (e) {
       return "{}";
     }

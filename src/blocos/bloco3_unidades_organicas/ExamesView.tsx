@@ -4,6 +4,7 @@ import { printElementById } from "../../lib/printUtils";
 import { Calendar, BookOpen, Printer, CheckCircle, Clock, MapPin, User, FileText } from "lucide-react";
 import ConfiguracaoExamesView from "./ConfiguracaoExamesView";
 import GeradorExamesView from "./GeradorExamesView";
+import { loadAllDocentes } from "../../lib/allocationUtils";
 
 export default function ExamesView({ user, onShowAlert }: { user: any; onShowAlert: (msg: string) => void }) {
   const [periods, setPeriods] = useState<any>(null);
@@ -38,7 +39,7 @@ export default function ExamesView({ user, onShowAlert }: { user: any; onShowAle
     });
 
     const unsubDoc = firestoreService.colaboradores.subscribe((data: any[]) => {
-      setDocentes((data || []).filter((d) => d.tipo === "Docente"));
+      setDocentes(loadAllDocentes(data || []));
     });
 
     const unsubSalas = firestoreService.espacos_fisicos.subscribe((data: any[]) => {

@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { firestoreService } from "../../lib/firestoreService";
 import { Users, BookOpen, Clock, Save } from "lucide-react";
+import { loadAllDocentes } from "../../lib/allocationUtils";
 
 export default function GeradorExamesView({ user, onShowAlert }: { user: any; onShowAlert: (msg: string) => void }) {
   const [docentes, setDocentes] = useState<any[]>([]);
@@ -10,7 +11,7 @@ export default function GeradorExamesView({ user, onShowAlert }: { user: any; on
 
   useEffect(() => {
     const unsubDocentes = firestoreService.colaboradores.subscribe((data: any) => {
-        setDocentes((data || []).filter((d: any) => d.tipo === "Docente"));
+        setDocentes(loadAllDocentes(data || []));
     });
     const unsubSalas = firestoreService.espacos_fisicos.subscribe((data: any) => {
         setSalas(data || []);

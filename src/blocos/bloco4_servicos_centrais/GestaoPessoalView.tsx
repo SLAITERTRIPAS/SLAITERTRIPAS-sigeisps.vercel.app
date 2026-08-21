@@ -208,6 +208,7 @@ export default function GestaoPessoalView({
   }, [title]);
   const [history, setHistory] = useState<any[]>(["menu"]);
   const [isProcessing, setIsProcessing] = useState(false);
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [selectedProcesso, setSelectedProcesso] = useState<any | null>(null);
   const [filtro, setFiltro] = useState<{
     tipo?: "Docente" | "CTA";
@@ -7299,12 +7300,28 @@ export default function GestaoPessoalView({
     <div className="h-full w-full bg-slate-50/30 flex flex-col font-sans overflow-hidden">
       <div className="flex-grow flex flex-col md:flex-row overflow-hidden p-2 md:p-4 gap-2 md:gap-4 h-full">
         {!hideSidebar && (
-          <aside className="w-36 md:w-72 bg-white rounded-[1.5rem] md:rounded-[2rem] shadow-[0_10px_40px_rgb(0,0,0,0.04)] border border-slate-100 flex-none flex flex-col overflow-y-auto p-2 md:p-4 gap-1 md:gap-2 relative z-20 h-full scrollbar-none">
-            <div className="mb-6 px-4 py-2 border-b border-slate-100 hidden md:block">
-              <h2 className="text-[10px] font-black text-slate-400 tracking-[0.2em]">
-                Repartição de Pessoal
-              </h2>
-            </div>
+          <aside
+            className={`bg-white rounded-[1.5rem] md:rounded-[2rem] shadow-[0_10px_40px_rgb(0,0,0,0.04)] border border-slate-100 flex-none flex flex-col overflow-y-auto p-2 md:p-4 gap-1 md:gap-2 relative z-20 h-full scrollbar-none transition-all duration-300 ${
+              isSidebarCollapsed ? "w-16 md:w-20 px-1 md:px-2" : "w-36 md:w-72"
+            }`}
+          >
+            {/* Botão de minimização/maximização centrado no limite do submenu lateral */}
+            <button
+              type="button"
+              onClick={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
+              title={isSidebarCollapsed ? "Maximizar Menu Lateral" : "Minimizar Menu Lateral"}
+              className="hidden md:flex absolute top-1/2 -translate-y-1/2 -right-3.5 z-40 w-7 h-7 bg-white text-slate-800 hover:bg-blue-600 hover:text-white rounded-full border-2 border-slate-200 hover:border-blue-600 shadow-xl items-center justify-center transition-all duration-300 transform hover:scale-110 focus:outline-none cursor-pointer"
+            >
+              {isSidebarCollapsed ? <ChevronRight size={16} /> : <ChevronLeft size={16} />}
+            </button>
+
+            {!isSidebarCollapsed && (
+              <div className="mb-6 px-4 py-2 border-b border-slate-100 hidden md:block">
+                <h2 className="text-[10px] font-black text-slate-400 tracking-[0.2em]">
+                  Repartição de Pessoal
+                </h2>
+              </div>
+            )}
             <div className="flex flex-col gap-1">
               {sideItems.map((item) => {
                 const hasSubItems = item.subItems && item.subItems.length > 0;
@@ -7336,10 +7353,12 @@ export default function GestaoPessoalView({
                       >
                         <item.icon size={18} strokeWidth={2.5} />
                       </div>
-                      <span className="flex-grow text-left truncate">
-                        {item.title}
-                      </span>
-                      {hasSubItems && (
+                      {!isSidebarCollapsed && (
+                        <span className="flex-grow text-left truncate">
+                          {item.title}
+                        </span>
+                      )}
+                      {hasSubItems && !isSidebarCollapsed && (
                         <ChevronRight
                           size={14}
                           className={`transition-transform duration-300 ${isExpanded ? "rotate-90" : ""}`}

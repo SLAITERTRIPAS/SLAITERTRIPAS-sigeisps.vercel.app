@@ -146,9 +146,14 @@ const getFilteredProductsForRubrica = (
     otherMatches.push(p);
   });
 
-  // Se houver produtos que batem com a necessidade ou categoria, retorne-os
-  if (exactNecMatches.length > 0 || categoryMatches.length > 0) {
-    return [...exactNecMatches, ...categoryMatches];
+  // Se houver necessidade indicada e existirem produtos correspondentes a esse grupo
+  if (cleanNec && exactNecMatches.length > 0) {
+    return exactNecMatches;
+  }
+
+  // Se houver produtos da categoria/rubrica
+  if (categoryMatches.length > 0) {
+    return categoryMatches;
   }
 
   // Fallback seguro: retorne a lista inteira de produtos da base de dados
@@ -1395,67 +1400,78 @@ export default function ActivityForm({
   ]);
 
   const downloadExcelTemplate = () => {
-    const headers = [
-      "Unidade Organica",
-      "Direcao",
-      "Departamento",
-      "Reparticao",
-      "Setor",
-      "Curso",
-      "Fonte Receita",
-      "Prioridade",
-      "Nome Atividade",
-      "Objetivo Atividade",
-      "Provincia Realizacao",
-      "Distrito Realizacao",
-      "Responsavel",
-      "Outros Colaboradores",
-      "Trimestre",
-      "Mes Realizacao",
-      "Data Inicio",
-      "Data Fim",
-      "Necessita Transporte",
-      "Necessita Aquisicao",
-      "Necessita Contratacao",
-      "Rubrica",
-      "Necessidade",
-      "Especificacao",
-      "Preco Unitario",
-      "Quantidade",
+    const row1 = [
+      "NO",
+      "Nº DIREÇÃO",
+      "I. IDENTIFICAÇÃO",
+      "I. IDENTIFICAÇÃO",
+      "I. IDENTIFICAÇÃO",
+      "I. IDENTIFICAÇÃO",
+      "I. IDENTIFICAÇÃO",
+      "CÓD/ATIVIDADE",
+      "II. ATIVIDADE",
+      "II. ATIVIDADE",
+      "V. TEMPO E DURAÇÃO",
+      "V. TEMPO E DURAÇÃO",
+      "VI. TRANS",
+      "VII. RUBRICAS E NECESSIDADES",
+      "VII. RUBRICAS E NECESSIDADES",
+      "VII. RUBRICAS E NECESSIDADES",
+      "VII. RUBRICAS E NECESSIDADES",
+      "VII. RUBRICAS E NECESSIDADES",
+      "IX. OBSERVAÇÕES",
+      "ESTADO"
+    ];
+
+    const row2 = [
+      "",
+      "",
+      "ÓRGÃO",
+      "DIREÇÃO",
+      "DEPARTAMENTO",
+      "FONTE DE RECEITA",
+      "PRIORIDADE",
+      "",
+      "NOME DA ATIVIDADE",
+      "OBJETIVO DA ATIVIDADE",
+      "TRIMESTRE/PERÍODO",
+      "MÊS/REAL.",
+      "N/T",
+      "RÚBRICA",
+      "NECESSIDADE",
+      "QUANT",
+      "UNITÁRIO (MT)",
+      "VALOR TOTAL GERAL (MZN)",
+      "",
+      ""
     ];
 
     const sampleRow = [
-      "Cursos do Ensino Superior Privado",
-      "Direção Científico-Pedagógica",
-      "Departamento de Engenharia e Tecnologia",
-      "",
-      "",
-      "Licenciatura em Engenharia Informática",
-      "Receitas Próprias",
-      "Alta",
-      "Seminário de Boas Práticas Pedagógicas",
-      "Capacitar os docentes em metodologias ágeis",
-      "Tete",
-      "Songo",
-      "Dr. Manuel Chaves",
-      "Dra. Elsa Muxanga",
-      "II Trimestre",
-      "Junho",
-      "2027-06-10",
-      "2027-06-12",
-      "Não",
-      "Não",
-      "Não",
-      "Bens",
-      "Consumíveis de informática",
-      "Toner Impressora HP LaserJet",
-      "4500",
-      "2",
+      "1", // NO
+      "1", // Nº DIREÇÃO
+      "Cursos do Ensino Superior Privado", // ÓRGÃO
+      "Direção Científico-Pedagógica", // DIREÇÃO
+      "Departamento de Engenharia e Tecnologia", // DEPARTAMENTO
+      "Receitas Próprias", // FONTE DE RECEITA
+      "Alta", // PRIORIDADE
+      "GDG/DPEP/001/IRA", // CÓD/ATIVIDADE
+      "Seminário de Boas Práticas Pedagógicas", // NOME DA ATIVIDADE
+      "Capacitar os docentes em metodologias ágeis", // OBJETIVO DA ATIVIDADE
+      "II Trimestre", // TRIMESTRE/PERÍODO
+      "Junho", // MÊS/REAL.
+      "Não", // N/T
+      "Bens", // RÚBRICA
+      "Consumíveis de informática", // NECESSIDADE
+      "2", // QUANT
+      "4500", // UNITÁRIO (MT)
+      "9000", // VALOR TOTAL GERAL (MZN)
+      "Nenhuma observação", // IX. OBSERVAÇÕES
+      "Planeado" // ESTADO
     ];
 
     // Portuguese Excel standard (using semicolon separator and UTF-8 BOM so accents display perfectly)
     const csvContent =
-      "\uFEFF" + [headers.join(";"), sampleRow.join(";")].join("\r\n");
+      "\uFEFF" + [row1.join(";"), row2.join(";"), sampleRow.join(";")].join("\r\n");
 
     const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
     const url = URL.createObjectURL(blob);
@@ -1484,7 +1500,19 @@ export default function ActivityForm({
           return;
         }
 
-        const dataRow = lines[1].split(";");
+        // Detect if this is the new 2-row header or old 1-row header
+        let dataRowIndex = 1;
+        const isMultiRowHeader = lines[0].includes("I. IDENTIFICAÇÃO") || lines[1].includes("ÓRGÃO");
+        if (isMultiRowHeader) {
+          dataRowIndex = 2;
+        }
+
+        if (lines.length <= dataRowIndex) {
+          alert("Nenhuma linha de dados encontrada no ficheiro CSV.");
+          return;
+        }
+
+        const dataRow = lines[dataRowIndex].split(";");
         if (dataRow.length < 10) {
           alert("Número de colunas insuficiente. Use o modelo descarregado.");
           return;
@@ -1492,32 +1520,101 @@ export default function ActivityForm({
 
         const getVal = (idx: number) => (dataRow[idx] || "").trim();
 
-        const org = getVal(0) || "Cursos do Ensino Superior Privado";
-        const dir = getVal(1) || "Direção Científico-Pedagógica";
-        const dep = getVal(2);
-        const rep = getVal(3);
-        const setVal = getVal(4);
-        const cur = getVal(5);
-        const rec = getVal(6) || "Receitas Próprias";
-        const prio = getVal(7) || "Média";
-        const nome = getVal(8) || "Nova Atividade Importada";
-        const obj = getVal(9);
-        const prov = getVal(10);
-        const dist = getVal(11);
-        const resp = getVal(12);
-        const outr = getVal(13);
-        const trim = getVal(14);
-        const mesVal = getVal(15);
-        const dtIni = getVal(16);
-        const dtFim = getVal(17);
-        const transp = getVal(18) || "Não";
-        const aq = getVal(19) || "Não";
-        const cont = getVal(20) || "Não";
-        const rub = getVal(21);
-        const nec = getVal(22);
-        const esp = getVal(23);
-        const unitPrice = parseFloat(getVal(24)) || 0;
-        const quantity = parseFloat(getVal(25)) || 0;
+        let org = "Cursos do Ensino Superior Privado";
+        let dir = "Direção Científico-Pedagógica";
+        let dep = "";
+        let rep = "";
+        let setVal = "";
+        let cur = "";
+        let rec = "Receitas Próprias";
+        let prio = "Média";
+        let nome = "Nova Atividade Importada";
+        let obj = "";
+        let prov = "Tete";
+        let dist = "Songo";
+        let resp = "";
+        let outr = "";
+        let trim = "I Trimestre";
+        let mesVal = "Janeiro";
+        let dtIni = "";
+        let dtFim = "";
+        let transp = "Não";
+        let aq = "Não";
+        let cont = "Não";
+        let rub = "";
+        let nec = "";
+        let esp = "";
+        let unitPrice = 0;
+        let quantity = 0;
+
+        if (isMultiRowHeader) {
+          // New layout mapping:
+          // 0: NO
+          // 1: Nº DIREÇÃO
+          // 2: ÓRGÃO
+          // 3: DIREÇÃO
+          // 4: DEPARTAMENTO
+          // 5: FONTE DE RECEITA
+          // 6: PRIORIDADE
+          // 7: CÓD/ATIVIDADE
+          // 8: NOME DA ATIVIDADE
+          // 9: OBJETIVO DA ATIVIDADE
+          // 10: TRIMESTRE/PERÍODO
+          // 11: MÊS/REAL.
+          // 12: N/T
+          // 13: RÚBRICA
+          // 14: NECESSIDADE
+          // 15: QUANT
+          // 16: UNITÁRIO (MT)
+          // 17: VALOR TOTAL GERAL (MZN)
+          // 18: IX. OBSERVAÇÕES
+          // 19: ESTADO
+          org = getVal(2) || org;
+          dir = getVal(3) || dir;
+          dep = getVal(4);
+          rep = getVal(4);
+          setVal = user?.setor || "";
+          rec = getVal(5) || rec;
+          prio = getVal(6) || prio;
+          nome = getVal(8) || nome;
+          obj = getVal(9);
+          trim = getVal(10);
+          mesVal = getVal(11);
+          transp = getVal(12) || "Não";
+          rub = getVal(13);
+          nec = getVal(14);
+          quantity = parseFloat(getVal(15)) || 0;
+          unitPrice = parseFloat(getVal(16)) || 0;
+        } else {
+          // Old layout mapping:
+          org = getVal(0) || org;
+          dir = getVal(1) || dir;
+          dep = getVal(2);
+          rep = getVal(3);
+          setVal = getVal(4);
+          cur = getVal(5);
+          rec = getVal(6) || rec;
+          prio = getVal(7) || prio;
+          nome = getVal(8) || nome;
+          obj = getVal(9);
+          prov = getVal(10);
+          dist = getVal(11);
+          resp = getVal(12);
+          outr = getVal(13);
+          trim = getVal(14);
+          mesVal = getVal(15);
+          dtIni = getVal(16);
+          dtFim = getVal(17);
+          transp = getVal(18) || "Não";
+          aq = getVal(19) || "Não";
+          cont = getVal(20) || "Não";
+          rub = getVal(21);
+          nec = getVal(22);
+          esp = getVal(23);
+          unitPrice = parseFloat(getVal(24)) || 0;
+          quantity = parseFloat(getVal(25)) || 0;
+        }
+
         const total = unitPrice * quantity;
 
         setSelectedCategory(org);
@@ -1527,9 +1624,9 @@ export default function ActivityForm({
           unidadeOrganica: "ISPS",
           servicoCentral: "",
           unidadeSelecionada: dir,
-          departamento: dep,
-          reparticao: rep,
-          setor: setVal,
+          departamento: dep || prev.departamento || user?.departamento || "",
+          reparticao: rep || prev.reparticao || user?.reparticao || "",
+          setor: setVal || prev.setor || user?.setor || "",
           curso: cur,
           fonteReceita: rec,
           prioridade: prio,
@@ -1537,7 +1634,7 @@ export default function ActivityForm({
           objetivoAtividade: obj,
           realizacaoProvincia: prov,
           realizacaoDistrito: dist,
-          responsavel: resp,
+          responsavel: resp || user?.nome || "",
           outrosColaboradores: outr,
           trimestre: trim,
           mesRealizacao: mesVal,
@@ -6793,6 +6890,18 @@ export default function ActivityForm({
                       }
                     };
 
+                    const userSetor = user?.setor || user?.sector || user?.seccao || "";
+                    const userRep = user?.reparticao || "";
+                    const userDept = user?.departamento || "";
+                    const userDir = user?.direcao || user?.servicoCentral || "";
+                    const userUnidade = user?.unidadeOrganica || user?.unidade || "";
+
+                    const finalSetor = formData.setor || formData.reparticao || userSetor || userRep || sectorName || currentSector || "Setor Geral";
+                    const finalReparticao = formData.reparticao || formData.setor || userRep || userSetor || sectorName || currentSector || "Repartição Geral";
+                    const finalDepartamento = formData.departamento || userDept || "Departamento Geral";
+                    const finalDirecao = formData.direcao || formData.unidadeSelecionada || userDir || "Direção Geral";
+                    const finalUnidade = formData.unidadeOrganica || formData.unidadeCentral || userUnidade || selectedCategory || "ISPS";
+
                     const submissionData = {
                       ...formData,
                       ...calculateTotalActivityData(months, formData),
@@ -6802,6 +6911,12 @@ export default function ActivityForm({
                       ano: nextYear,
                       mesesRealizacao: months,
                       mesRealizacao: months[0] || formData.mesRealizacao || formData.mes || "",
+                      setor: finalSetor,
+                      reparticao: finalReparticao,
+                      departamento: finalDepartamento,
+                      direcao: finalDirecao,
+                      unidadeOrganica: finalUnidade,
+                      unidadeSelecionada: finalDirecao,
                     };
 
                     // Validação Final de Duplicidade (Nome, Código e Mês)

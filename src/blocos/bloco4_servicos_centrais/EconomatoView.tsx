@@ -13,6 +13,8 @@ import {
   PlusCircle,
   X,
   ShieldCheck,
+  ChevronLeft,
+  ChevronRight,
 } from "lucide-react";
 import { Bem } from "../../types";
 import { firestoreService } from "../../lib/firestoreService";
@@ -53,6 +55,7 @@ export default function EconomatoView({
   onBack: () => void;
 }) {
   const [bens, setBens] = React.useState<Bem[]>([]);
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [activeSubView, setActiveSubView] = useState("plano");
   const [showEntryForm, setShowEntryForm] = useState(false);
   const [stockEntries, setStockEntries] = React.useState<any[]>([]);
@@ -916,16 +919,33 @@ export default function EconomatoView({
   };
 
   return (
-    <div className="flex h-full bg-gray-50">
-      <div className="w-64 bg-slate-900 text-white flex flex-col p-4 shadow-xl">
+    <div className="flex h-full bg-gray-50 relative">
+      <div
+        className={`bg-slate-900 text-white flex flex-col p-4 shadow-xl relative transition-all duration-300 ${
+          isSidebarCollapsed ? "w-16 px-2" : "w-64"
+        }`}
+      >
+        {/* Botão de minimização/maximização centrado no limite do submenu lateral */}
+        <button
+          type="button"
+          onClick={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
+          title={isSidebarCollapsed ? "Maximizar Menu Lateral" : "Minimizar Menu Lateral"}
+          className="hidden md:flex absolute top-1/2 -translate-y-1/2 -right-3.5 z-40 w-7 h-7 bg-white text-slate-900 hover:bg-blue-600 hover:text-white rounded-full border-2 border-slate-300 hover:border-blue-600 shadow-xl items-center justify-center transition-all duration-300 transform hover:scale-110 focus:outline-none cursor-pointer"
+        >
+          {isSidebarCollapsed ? <ChevronRight size={16} /> : <ChevronLeft size={16} />}
+        </button>
+
         {/* Voltar Button */}
         {isPatrimonioBossOrAdmin(user) && (
           <button
             onClick={onBack}
-            className="w-full flex items-center gap-3 p-3 mb-4 rounded-xl transition-all duration-200 bg-slate-800/50 hover:bg-slate-800 text-amber-500 hover:text-amber-400 font-bold border border-slate-700/50 hover:border-slate-600 shadow-sm"
+            title="Voltar ao Menu"
+            className={`w-full flex items-center gap-3 p-3 mb-4 rounded-xl transition-all duration-200 bg-slate-800/50 hover:bg-slate-800 text-amber-500 hover:text-amber-400 font-bold border border-slate-700/50 hover:border-slate-600 shadow-sm ${
+              isSidebarCollapsed ? "justify-center px-0" : ""
+            }`}
           >
-            <ArrowLeft size={18} />
-            <span>Voltar ao Menu</span>
+            <ArrowLeft size={18} className="shrink-0" />
+            {!isSidebarCollapsed && <span>Voltar ao Menu</span>}
           </button>
         )}
 
@@ -934,10 +954,13 @@ export default function EconomatoView({
             <button
               key={item.id}
               onClick={() => setActiveSubView(item.id)}
-              className={`w-full flex items-center gap-3 p-3 rounded-xl transition-colors ${activeSubView === item.id ? "bg-slate-800" : "hover:bg-slate-800"}`}
+              title={item.title}
+              className={`w-full flex items-center gap-3 p-3 rounded-xl transition-colors ${
+                isSidebarCollapsed ? "justify-center px-0" : ""
+              } ${activeSubView === item.id ? "bg-slate-800 text-white font-bold" : "hover:bg-slate-800 text-slate-300"}`}
             >
-              <item.icon size={20} />
-              {item.title}
+              <item.icon size={20} className="shrink-0" />
+              {!isSidebarCollapsed && <span>{item.title}</span>}
             </button>
           ))}
         </div>

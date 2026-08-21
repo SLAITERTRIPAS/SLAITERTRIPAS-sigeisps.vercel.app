@@ -3,6 +3,7 @@ import { Book, Building, FlaskConical, Wrench, Plus, Trash2, Edit3, CheckCircle,
 import { firestoreService } from "../../lib/firestoreService";
 import RegistarMateriaisBensForm from "../bloco8_gerais/RegistarMateriaisBensForm";
 import { isSuperBossUser } from "../../lib/auth";
+import { loadAllDocentes } from "../../lib/allocationUtils";
 
 export default function DisciplinasEspacosFisicosView({
   user,
@@ -72,7 +73,7 @@ export default function DisciplinasEspacosFisicosView({
       setDisciplinasList(data || []);
     });
     const unsubColab = firestoreService.colaboradores.subscribe((data: any[]) => {
-      setDocentes((data || []).filter((d: any) => d.tipo === "Docente"));
+      setDocentes(loadAllDocentes(data || []));
     });
     return () => {
       unsubDisc();
@@ -326,7 +327,9 @@ export default function DisciplinasEspacosFisicosView({
               >
                 <option value="">Selecione o Docente</option>
                 {docentes.map((d) => (
-                  <option key={d.id} value={d.id}>{d.nome}</option>
+                  <option key={d.id || d.nuit || d.nome} value={d.id || d.nome}>
+                    {d.nome} {d.categoria ? `— (${d.categoria})` : ""}
+                  </option>
                 ))}
               </select>
             </div>
@@ -386,7 +389,7 @@ export default function DisciplinasEspacosFisicosView({
               </thead>
               <tbody className="divide-y divide-slate-100">
                 {displayedDisciplinas.map((disc) => {
-                  const doc = docentes.find((d) => d.id === disc.docenteId);
+                  const doc = docentes.find((d) => d.id === disc.docenteId || d.nome === disc.docenteId);
                   const isComExame = disc.classificacaoExame !== "sem_exame";
                   return (
                     <tr key={disc.id} className="hover:bg-slate-50 transition">
@@ -402,7 +405,18 @@ export default function DisciplinasEspacosFisicosView({
                         <div className="text-[10px] text-slate-500">{disc.turma || "N/A"}</div>
                         <div className="text-[10px] text-indigo-600 font-bold">{disc.cargaSemanal || "N/A"}</div>
                       </td>
-                      <td className="p-3 font-medium text-slate-700">{doc ? doc.nome : "Não atribuído"}</td>
+                      <td className="p-3">
+                        {doc ? (
+                          <div>
+                            <div className="font-bold text-slate-800">{doc.nome}</div>
+                            <div className="text-[10px] text-slate-500">{doc.categoria || doc.cargo || "Docente"}</div>
+                          </div>
+                        ) : disc.docenteId ? (
+                          <span className="font-medium text-slate-800">{disc.docenteId}</span>
+                        ) : (
+                          <span className="text-slate-400 italic">Não atribuído</span>
+                        )}
+                      </td>
                       <td className="p-3">
                         {isComExame ? (
                           <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold bg-emerald-100 text-emerald-800">

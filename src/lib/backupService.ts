@@ -747,6 +747,14 @@ export async function restoreFullBackup(
     progressPercent: 100,
   });
 
+  try {
+    localStorage.setItem("sigep_last_restore", Date.now().toString());
+    if (typeof window !== "undefined") {
+      window.dispatchEvent(new CustomEvent("sigep_data_restored", { detail: { totalRestored } }));
+      window.dispatchEvent(new Event("storage"));
+    }
+  } catch (_) {}
+
   if (onProgress) onProgress("Restauração e gravação de dados na base de dados concluída com sucesso!");
   return { totalRestored, restoredStats, organStats };
 }

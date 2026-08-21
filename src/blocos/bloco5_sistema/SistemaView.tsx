@@ -17,6 +17,8 @@ import {
   LogOut,
   Power,
   User,
+  ChevronLeft,
+  ChevronRight,
   Plus,
   CheckSquare,
   UserPlus,
@@ -24,7 +26,6 @@ import {
   ShieldCheck,
   Loader2,
   Network,
-  ChevronRight,
   Building,
   MessageSquare,
   Box,
@@ -109,6 +110,7 @@ export default function SistemaView({
   };
 
   const [isMenuOpen, setIsMenuOpen] = useState(true);
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [activeItem, setActiveItem] = useState("Sobre o Sistema");
 
   const canManageUsers =
@@ -1781,30 +1783,51 @@ export default function SistemaView({
           </div>
         </main>
         {isMenuOpen && (
-          <aside className="w-80 bg-[#000066] text-white flex flex-col shadow-2xl">
-            <div className="flex-grow overflow-y-auto py-8 px-4 space-y-[1px]">
+          <aside
+            className={`bg-[#000066] text-white flex flex-col shadow-2xl relative transition-all duration-300 ${
+              isSidebarCollapsed ? "w-20 px-1" : "w-80 px-4"
+            }`}
+          >
+            {/* Botão de minimização/maximização centrado no limite do submenu lateral */}
+            <button
+              type="button"
+              onClick={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
+              title={isSidebarCollapsed ? "Maximizar Menu Lateral" : "Minimizar Menu Lateral"}
+              className="hidden md:flex absolute top-1/2 -translate-y-1/2 -left-3.5 z-40 w-7 h-7 bg-white text-[#000066] hover:bg-amber-400 hover:text-slate-900 rounded-full border-2 border-blue-200 shadow-xl items-center justify-center transition-all duration-300 transform hover:scale-110 focus:outline-none cursor-pointer"
+            >
+              {isSidebarCollapsed ? <ChevronLeft size={16} /> : <ChevronRight size={16} />}
+            </button>
+
+            <div className="flex-grow overflow-y-auto py-8 space-y-[1px]">
               {menuItems
                 .filter((item) => !(item as any).hidden)
                 .map((item, idx) => (
                   <button
                     key={idx}
                     onClick={() => setActiveItem(item.title)}
-                    className={`w-full flex items-center gap-4 px-6 py-4 rounded-2xl text-[11px] font-black tracking-widest transition-all ${activeItem === item.title ? "bg-white text-[#000066]" : "hover:bg-white/10"}`}
+                    title={item.title}
+                    className={`w-full flex items-center gap-4 py-4 rounded-2xl text-[11px] font-black tracking-widest transition-all ${
+                      isSidebarCollapsed ? "justify-center px-2" : "px-6"
+                    } ${activeItem === item.title ? "bg-white text-[#000066]" : "hover:bg-white/10"}`}
                   >
-                    <item.icon size={18} /> {item.title}
+                    <item.icon size={18} className="shrink-0" />
+                    {!isSidebarCollapsed && <span>{item.title}</span>}
                   </button>
                 ))}
             </div>
-            <div className="p-8 border-t border-white/10">
+            <div className={`p-4 border-t border-white/10 ${isSidebarCollapsed ? "p-2" : "p-8"}`}>
               <button
                 onClick={onLogout}
-                className="group w-full flex items-center gap-4 px-6 py-4 rounded-2xl text-[11px] font-black tracking-widest transition-colors hover:text-red-500 hover:bg-white/5"
+                title="Sair do Sistema"
+                className={`group w-full flex items-center gap-4 py-4 rounded-2xl text-[11px] font-black tracking-widest transition-colors hover:text-red-500 hover:bg-white/5 ${
+                  isSidebarCollapsed ? "justify-center px-2" : "px-6"
+                }`}
               >
                 <Power
                   size={18}
-                  className="animate-rgb-icon group-hover:!text-red-500 group-hover:animate-none transition-colors"
+                  className="animate-rgb-icon group-hover:!text-red-500 group-hover:animate-none transition-colors shrink-0"
                 />{" "}
-                Sair do Sistema
+                {!isSidebarCollapsed && <span>Sair do Sistema</span>}
               </button>
             </div>
           </aside>

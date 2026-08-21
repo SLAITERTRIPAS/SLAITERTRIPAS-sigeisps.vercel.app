@@ -522,9 +522,11 @@ export default function PlanoWorkflowView({
       }
     });
 
-    return Array.from(uniqueMap.values())
-      .sort((a, b) => compareActivitiesStandardOrder(a, b, getActMonthIndex))
-      .filter((a) => Number(a?.ano || 2026) === Number(selectedYear));
+    const sortedList = Array.from(uniqueMap.values())
+      .sort((a, b) => compareActivitiesStandardOrder(a, b, getActMonthIndex));
+
+    const yearMatches = sortedList.filter((a) => Number(a?.ano || selectedYear) === Number(selectedYear));
+    return yearMatches.length > 0 ? yearMatches : sortedList;
   }, [
     rawActivities,
     user,
@@ -1670,7 +1672,7 @@ export default function PlanoWorkflowView({
     | "plano_setorial"
     | "plano_orcamento"
     | "necessidades_quantidades"
-  >("plano_setorial");
+  >("plano_orcamento");
 
   const groupedNecessidadesPlanificadas = useMemo(() => {
     const planActivities = filteredActivities.filter(
@@ -1805,68 +1807,6 @@ export default function PlanoWorkflowView({
   } | null>(null);
 
   const [isAllocating, setIsAllocating] = useState(false);
-
-  const handleAutoAllocateSectors = async () => {
-    if (isAllocating) return;
-    try {
-      setIsAllocating(true);
-      const institucionalActivities = rawActivities.filter(
-        (a) =>
-          (a.status as any) === "institucional" &&
-          Number(a.ano) === selectedYear,
-      );
-
-      if (institucionalActivities.length === 0) {
-        onShowAlert(
-          "Nenhuma atividade institucional encontrada para alocação no ciclo de " +
-            selectedYear,
-        );
-        setIsAllocating(false);
-        return;
-      }
-
-      if (
-        !window.confirm(
-          `Deseja executar a alocação automática de setores para as ${institucionalActivities.length} atividades do Plano Institucional de ${selectedYear}?`,
-        )
-      ) {
-        setIsAllocating(false);
-        return;
-      }
-
-      let allocatedCount = 0;
-      for (const act of institucionalActivities) {
-        const allocation: any = determineSectorAllocation(act, colaboradores);
-        if (allocation) {
-          const needsUpdate =
-            act.direcao !== allocation.direcao ||
-            act.departamento !== allocation.departamento ||
-            (act.setor !== allocation.setor &&
-              act.reparticao !== allocation.setor);
-
-          if (needsUpdate) {
-            await firestoreService.matrixActivities.update(act.id, {
-              direcao: allocation.direcao,
-              departamento: allocation.departamento,
-              setor: allocation.setor,
-              reparticao: allocation.setor,
-              updatedAt: new Date().toISOString(),
-            });
-            allocatedCount++;
-          }
-        }
-      }
-
-      onShowAlert(
-        `Alocação concluída! ${allocatedCount} atividades foram distribuídas automaticamente para seus respectivos setores de acordo com o Plano Institucional.`,
-      );
-    } catch (err: any) {
-      console.error("Erro ao alocar atividades nos setores:", err);
-      onShowAlert("Ocorreu um erro durante a alocação: " + err.message);
-    } finally {
-      setIsAllocating(false);
-    }
-  };
 
   const handleReplicatePreviousPlan = async () => {
     // 1. Identificar o setor do utilizador
@@ -3188,6 +3128,7 @@ export default function PlanoWorkflowView({
       "Departamento",
       "Direção",
     );
+
   const handleUnifyDepartmentPlan = async () => {
     const subordinateActs = filteredActivities.filter(
       (a) =>
@@ -3338,16 +3279,44 @@ export default function PlanoWorkflowView({
     handleWorkflowTransition(
       "planificacao",
       "dpep_chefe",
-      "Planificação",
+      "Setor de Planificação",
       "Chefe do DPEP",
     );
-  const handleSendChefeDPEPToMeritos = () =>
+
+  const handleSendChefeDPEPToOrgaoColegial = () =>
     handleWorkflowTransition(
       "dpep_chefe",
-      "meritos",
+      "orgao_colegial",
       "Chefe do DPEP",
-      "Méritos de Direção",
+      "Órgão Colegial",
     );
+
+  const handleOrgaoColegialAprovar = async () => {
+    try {
+      setIsLoading(true);
+      const actsToApprove = filteredActivities.filter(
+        (a) => (a.status as any) === "orgao_colegial" || (a.status as any) === "dpep_chefe" || (a.status as any) === "planificacao" || (a.status as any) === "institucional"
+      );
+      
+      await Promise.all(
+        actsToApprove.map((act) =>
+          firestoreService.matrixActivities.update(act.id, {
+            status: "institucional",
+            homologado: true,
+            dataHomologacao: new Date().toISOString(),
+          }),
+        ),
+      );
+
+      await handlePublishPesoe(true);
+      onShowAlert("Plano Institucional e Proposta do PESOE foram aprovados e homologados pelo Órgão Colegial com sucesso!");
+    } catch (err) {
+      console.error(err);
+      alert("Ocorreu um erro ao aprovar a proposta no Órgão Colegial.");
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   const handleSendPlanificacaoToInstitucional = async () => {
     const FIVE_DIRECTIONS = [
@@ -3368,7 +3337,7 @@ export default function PlanoWorkflowView({
 
     const submittedDirs = new Set(
       rawActivities
-        .filter((a) => Number(a.ano || 2026) === Number(selectedYear) && ["planificacao", "institucional"].includes(a.status))
+        .filter((a) => Number(a.ano || 2026) === Number(selectedYear) && ["planificacao", "institucional", "dpep_chefe", "orgao_colegial"].includes(a.status))
         .map((a) => getCanonicalDirection(a.direcao))
     );
 
@@ -3393,9 +3362,9 @@ export default function PlanoWorkflowView({
 
     await handleWorkflowTransition(
       "planificacao",
-      "institucional",
-      "Planificação",
-      "Plano Institucional",
+      "dpep_chefe",
+      "Setor de Planificação",
+      "Chefe do DPEP",
     );
   };
 
@@ -3859,7 +3828,7 @@ export default function PlanoWorkflowView({
                 : "🔴 INDISPONÍVEL PARA DIRETORES"}
             </span>
           </div>
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-2">
             {(isSuperBossUser(realUser)
               ? [
                   "Setor",
@@ -3867,6 +3836,8 @@ export default function PlanoWorkflowView({
                   "Departamento",
                   "Direção",
                   "Planificação",
+                  "Chefe DPEP",
+                  "Órgão Colegial",
                 ]
               : []
             ).map((role) => (
@@ -3887,10 +3858,14 @@ export default function PlanoWorkflowView({
                   : role === "Repartição"
                     ? "Plano da Repartição"
                     : role === "Departamento"
-                      ? "Chefe Departamento"
+                      ? "Plano do Departamento"
                       : role === "Direção"
                         ? "Plano de Direção"
-                        : "Setor de Planificação"}
+                        : role === "Planificação"
+                          ? "Setor de Planificação"
+                          : role === "Chefe DPEP"
+                            ? "Chefe do DPEP"
+                            : "Órgão Colegial"}
               </button>
             ))}
           </div>
@@ -4199,7 +4174,7 @@ export default function PlanoWorkflowView({
                                 <span>Guardar</span>
                               </button>
 
-                              <button
+                               <button
                                 onClick={() => {
                                   setShowFileMenu(false);
                                   if (isReadOnly) {
@@ -4216,13 +4191,13 @@ export default function PlanoWorkflowView({
                                     handleSendDepartamentoToDirecao();
                                   else if (selectedRoleMode === "Direção")
                                     handleSendDirecaoToPlanificacao();
-                                  else if (selectedRoleMode === "Planificação") {
-                                    if (isChefeDPEP) {
-                                      handleSendPlanificacaoToInstitucional();
-                                    } else {
-                                      handleSendPlanificacaoToChefeDPEP();
-                                    }
-                                  } else
+                                  else if (selectedRoleMode === "Planificação")
+                                    handleSendPlanificacaoToChefeDPEP();
+                                  else if (selectedRoleMode === "Chefe DPEP")
+                                    handleSendChefeDPEPToOrgaoColegial();
+                                  else if (selectedRoleMode === "Órgão Colegial")
+                                    handleOrgaoColegialAprovar();
+                                  else
                                     onShowAlert(
                                       "Ação não configurada para este nível.",
                                     );
@@ -4268,6 +4243,8 @@ export default function PlanoWorkflowView({
                         "Departamento",
                         "Direção",
                         "Planificação",
+                        "Chefe DPEP",
+                        "Órgão Colegial",
                       ].includes(selectedRoleMode) ? (
                         <>
                           {selectedRoleMode === "Direção" && (
@@ -4289,17 +4266,30 @@ export default function PlanoWorkflowView({
                                 handleSendDepartamentoToDirecao();
                               else if (selectedRoleMode === "Direção")
                                 handleSendDirecaoToPlanificacao();
-                              else if (selectedRoleMode === "Planificação") {
-                                if (isChefeDPEP) {
-                                  handleSendPlanificacaoToInstitucional();
-                                } else {
-                                  handleSendPlanificacaoToChefeDPEP();
-                                }
-                              }
+                              else if (selectedRoleMode === "Planificação")
+                                handleSendPlanificacaoToChefeDPEP();
+                              else if (selectedRoleMode === "Chefe DPEP")
+                                handleSendChefeDPEPToOrgaoColegial();
+                              else if (selectedRoleMode === "Órgão Colegial")
+                                handleOrgaoColegialAprovar();
                             }}
-                            className="bg-[#2563eb] hover:bg-[#1d4ed8] text-white font-black tracking-widest text-[9px] uppercase px-5 py-2.5 rounded-xl transition-all flex items-center gap-2 whitespace-nowrap shadow-lg shadow-blue-100 h-[40px]"
+                            className={`${selectedRoleMode === "Órgão Colegial" ? "bg-emerald-600 hover:bg-emerald-700 shadow-emerald-100" : "bg-[#2563eb] hover:bg-[#1d4ed8] shadow-blue-100"} text-white font-black tracking-widest text-[9px] uppercase px-5 py-2.5 rounded-xl transition-all flex items-center gap-2 whitespace-nowrap shadow-lg h-[40px]`}
                           >
-                            <Send size={14} strokeWidth={3} /> SUBMETER O PLANO DE ATIVIDADE
+                            <Send size={14} strokeWidth={3} /> {
+                              selectedRoleMode === "Setor"
+                                ? "SUBMETER PLANO DO SETOR"
+                                : selectedRoleMode === "Repartição"
+                                  ? "SUBMETER PLANO DA REPARTIÇÃO"
+                                  : selectedRoleMode === "Departamento"
+                                    ? "SUBMETER PLANO DO DEPARTAMENTO"
+                                    : selectedRoleMode === "Direção"
+                                      ? "SUBMETER PLANO DA DIREÇÃO"
+                                      : selectedRoleMode === "Planificação"
+                                        ? "ENVIAR AO CHEFE DO DPEP"
+                                        : selectedRoleMode === "Chefe DPEP"
+                                          ? "ENVIAR PROPOSTA AO ÓRGÃO COLEGIAL"
+                                          : "APROVAR & HOMOLOGAR PESOE"
+                            }
                           </button>
                         </>
                       ) : (
@@ -4320,38 +4310,6 @@ export default function PlanoWorkflowView({
                         <Trash2 size={14} /> Excluir Planos Anteriores
                       </button>
                     )}
-                    {selectedYear === 2027 && (
-                      <button
-                        onClick={handleCleanSlate2027}
-                        disabled={isLoading}
-                        className="px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white text-[10px] font-black rounded-lg transition-colors uppercase tracking-widest flex items-center gap-2 shadow-lg"
-                      >
-                        <Trash2 size={14} /> Limpar Ciclo 2027
-                      </button>
-                    )}
-                    <button
-                      onClick={handleBulkUpdateActivityCodes}
-                      disabled={isLoading}
-                      className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-[10px] font-black rounded-lg transition-colors uppercase tracking-widest flex items-center gap-2 shadow-lg"
-                    >
-                      <RefreshCw size={14} strokeWidth={1.5} /> Atualizar Códigos (Formato Novo)
-                    </button>
-                    <button
-                      onClick={handleDeleteUnassignedActivities}
-                      disabled={isLoading}
-                      className="px-4 py-2 bg-rose-700 hover:bg-rose-800 text-white text-[10px] font-black rounded-lg transition-colors uppercase tracking-widest flex items-center gap-2 shadow-lg"
-                      title="Excluir todas as atividades com campo departamento vazio ou em branco"
-                    >
-                      <Trash2 size={14} /> Excluir Sem Departamento
-                    </button>
-                    <button
-                      onClick={handleDeleteDuplicateActivities}
-                      disabled={isLoading}
-                      className="px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white text-[10px] font-black rounded-lg transition-colors uppercase tracking-widest flex items-center gap-2 shadow-lg"
-                      title="Identificar e excluir atividades repetidas (mesmo nome e código)"
-                    >
-                      <Trash2 size={14} /> Excluir Atividades Duplicadas
-                    </button>
                   </div>
                 )}
               </>
@@ -5276,12 +5234,6 @@ export default function PlanoWorkflowView({
                             key={dept}
                             className="bg-white border border-slate-100 rounded-2xl overflow-hidden shadow-sm space-y-4"
                           >
-                            <InstitutionalHeader 
-                              unidadeName={user.unidadeOrganica}
-                              direcaoName={user.direcao}
-                              departamentoName={dept}
-                              year={selectedYear} 
-                            />
                             <div className="bg-slate-900 text-white p-6 rounded-2xl flex flex-col md:flex-row justify-between items-center gap-4">
                               <div>
                                 <span className="inline-block bg-emerald-500/20 text-emerald-300 text-[10px] font-black uppercase tracking-widest px-3 py-1 rounded-full mb-2">
@@ -5438,12 +5390,6 @@ export default function PlanoWorkflowView({
                           key={dept}
                           className="bg-white border border-slate-100 rounded-2xl overflow-hidden shadow-sm"
                         >
-                          <InstitutionalHeader 
-                            unidadeName={user.unidadeOrganica}
-                            direcaoName={user.direcao} 
-                            departamentoName={dept}
-                            year={selectedYear} 
-                          />
                           <div className="bg-slate-900 text-white p-6 rounded-t-2xl flex flex-col md:flex-row justify-between items-center gap-4">
                             <div>
                                 <span className="inline-block bg-emerald-500/20 text-emerald-300 text-[10px] font-black uppercase tracking-widest px-3 py-1 rounded-full mb-2">
@@ -5634,16 +5580,6 @@ export default function PlanoWorkflowView({
                 <div className="bg-white border-b border-slate-200 px-8 py-5 flex items-center justify-between print:hidden overflow-x-auto no-scrollbar">
                   <div className="flex gap-4 min-w-max">
                     <button
-                      onClick={() => setActiveSubTab("plano_setorial")}
-                      className={`px-6 py-3 rounded-xl font-black text-xs uppercase tracking-wider transition-all border ${
-                        activeSubTab === "plano_setorial"
-                          ? "bg-slate-900 text-white border-slate-950 shadow-md"
-                          : "bg-white text-slate-600 hover:bg-slate-50 border-slate-200"
-                      }`}
-                    >
-                      Plano Setorial
-                    </button>
-                    <button
                       onClick={() => setActiveSubTab("plano_orcamento")}
                       className={`px-6 py-3 rounded-xl font-black text-xs uppercase tracking-wider transition-all border ${
                         activeSubTab === "plano_orcamento"
@@ -5662,26 +5598,6 @@ export default function PlanoWorkflowView({
                       }`}
                     >
                       📦 Necessidades & Quantidades
-                    </button>
-                    <button
-                      onClick={() => setActiveSubTab("plano_reparticao")}
-                      className={`px-6 py-3 rounded-xl font-black text-xs uppercase tracking-wider transition-all border ${
-                        activeSubTab === "plano_reparticao"
-                          ? "bg-slate-900 text-white border-slate-950 shadow-md"
-                          : "bg-white text-slate-600 hover:bg-slate-50 border-slate-200"
-                      }`}
-                    >
-                      Plano da Repartição
-                    </button>
-                    <button
-                      onClick={() => setActiveSubTab("plano_departamento")}
-                      className={`px-6 py-3 rounded-xl font-black text-xs uppercase tracking-wider transition-all border ${
-                        activeSubTab === "plano_departamento"
-                          ? "bg-slate-900 text-white border-slate-950 shadow-md"
-                          : "bg-white text-slate-600 hover:bg-slate-50 border-slate-200"
-                      }`}
-                    >
-                      Plano do Departamento
                     </button>
                     <button
                       onClick={() => setActiveSubTab("plano_direcoes")}
@@ -6909,21 +6825,6 @@ export default function PlanoWorkflowView({
                             </p>
                           </div>
                           <div className="flex gap-4">
-                            <button
-                              onClick={handleAutoAllocateSectors}
-                              disabled={isAllocating}
-                              className="bg-amber-600 hover:bg-amber-700 text-white px-5 py-3 rounded-xl text-xs font-black uppercase tracking-wider transition-all flex items-center gap-2 shadow-lg shadow-amber-200 disabled:opacity-50"
-                              title="Fazer a alocação de cada atividade no seu setor correspondente automaticamente"
-                            >
-                              <RefreshCw
-                                size={14}
-                                strokeWidth={1.5}
-                                className={isAllocating ? "animate-spin" : ""}
-                              />{" "}
-                              {isAllocating
-                                ? "A Alocar..."
-                                : "Alocação Automática de Setores"}
-                            </button>
                             {isAdminOrProgrammer && (
                               <button
                                 onClick={() => fileInputRef.current?.click()}
@@ -7131,319 +7032,38 @@ export default function PlanoWorkflowView({
                           isPlanificacaoHeader={isPlanificacao}
                         />
 
-                        {/* Info extra para visualização web */}
-                        <div className="flex flex-col md:flex-row justify-between items-center gap-6 mb-3 border-b-2 border-slate-900 pb-2 font-sans bg-slate-50/70 p-6 rounded-3xl print:hidden mt-4">
+                        {/* Subcabeçalho Padronizado do Plano */}
+                        <div className="flex flex-col md:flex-row justify-between items-center gap-4 mb-4 border border-slate-200/80 p-4 rounded-2xl bg-white shadow-sm print:hidden mt-2">
                           <div className="flex items-center gap-3">
-                            <div className="bg-blue-600 p-2 rounded-xl shadow-lg">
-                              <ShieldCheck className="text-white" size={24} />
+                            <div className="bg-blue-600 p-2.5 rounded-xl shadow-md text-white">
+                              <ShieldCheck size={22} />
                             </div>
                             <div>
-                              <h3 className="text-xl font-black text-slate-900 tracking-tight uppercase leading-none">
+                              <h3 className="text-sm md:text-base font-black text-slate-900 tracking-tight uppercase leading-none">
                                 Plano Institucional Consolidado
                               </h3>
-                              <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mt-1">
+                              <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mt-1">
                                 Visualização Oficial do DPEP
                               </p>
                             </div>
                           </div>
-                          <div className="text-right">
-                            <p className="text-sm font-black uppercase border-y-2 border-slate-900 py-2 inline-block px-4 text-[#121c60] bg-white rounded-lg">
-                              PESOE: {selectedYear}
-                            </p>
-                          </div>
-                        </div>
-
-                        <div className="flex flex-col md:flex-row justify-between items-center gap-6 pb-2 border-b border-slate-200 print:hidden">
-                          <div className="flex-1">
-                            <h2 className="text-2xl font-black text-slate-900 uppercase tracking-tighter leading-none mb-1">
-                              Instrumento de Transformação
-                            </h2>
-                            <p className="text-slate-500 text-xs italic font-medium">
-                              Organizado estritamente na estrutura: N/O,
-                              Direção, Atividade, Orçamento.
-                            </p>
-                          </div>
-
-                          <div className="flex items-center gap-4 w-full md:w-auto">
+                          <div className="flex items-center gap-3 w-full md:w-auto">
                             <div className="relative w-full md:w-64">
                               <Search
                                 className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
-                                size={15}
+                                size={14}
                               />
                               <input
                                 type="text"
                                 placeholder="Procurar atividade..."
                                 value={searchTerm}
                                 onChange={(e) => setSearchTerm(e.target.value)}
-                                className="w-full text-xs font-bold pl-9 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none"
+                                className="w-full text-xs font-bold pl-9 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:bg-white focus:border-blue-500 transition-all"
                               />
                             </div>
-                          </div>
-                        </div>
-
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8 print:hidden">
-                          <div className="bg-slate-900 p-6 rounded-[2rem] text-white shadow-2xl border border-slate-800 relative overflow-hidden group">
-                            <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
-                              <TrendingUp size={80} />
-                            </div>
-                            <p className="text-[10px] uppercase font-black tracking-widest opacity-60">
-                              Orçamento Institucional Consolidado
-                            </p>
-                            <h3 className="text-4xl font-black mt-2 tracking-tighter">
-                              {(
-                                filteredActivities
-                                  .filter(
-                                    (a) =>
-                                      (a.status as any) === "institucional",
-                                  )
-                                  .reduce(
-                                    (sum, act) => sum + getActivityTotal(act),
-                                    0,
-                                  ) as number
-                              ).toLocaleString("pt-MZ", {
-                                minimumFractionDigits: 2,
-                                maximumFractionDigits: 2,
-                              })}
-                              <span className="text-sm ml-2 opacity-50 font-medium tracking-normal">
-                                MZN
-                              </span>
-                            </h3>
-                          </div>
-                          <div className="bg-white p-6 rounded-[2rem] border border-slate-200 shadow-xl flex flex-col justify-center">
-                            <p className="text-[10px] uppercase font-black tracking-widest text-slate-400">
-                              Total de Atividades Consolidadas
-                            </p>
-                            <h3 className="text-4xl font-black text-slate-900 mt-2 tracking-tighter">
-                              {
-                                filteredActivities.filter(
-                                  (a) => (a.status as any) === "institucional",
-                                ).length
-                              }
-                              <span className="text-sm ml-2 text-slate-400 font-medium tracking-normal">
-                                Itens
-                              </span>
-                            </h3>
-                          </div>
-                          <div className="bg-indigo-50 p-6 rounded-[2rem] border border-indigo-100 shadow-inner flex flex-col justify-center items-center text-center">
-                            <div className="flex flex-col gap-2">
-                              <p className="text-[10px] uppercase font-black tracking-widest text-indigo-400 mb-1">
-                                Ações de Gestão do Plano
-                              </p>
-                              <div className="flex gap-2">
-                                {(isBossOrAdmin || isPlanificacao) && (
-                                  <button
-                                    onClick={handleFixNumbering}
-                                    disabled={isProcessing}
-                                    className="flex items-center gap-2 px-6 py-3 bg-indigo-600 text-white rounded-2xl font-black text-xs hover:bg-indigo-700 transition-all shadow-lg shadow-indigo-200 disabled:opacity-50"
-                                  >
-                                    <LayoutGrid size={16} /> REORDENAR E
-                                    RENUMERAR TUDO
-                                  </button>
-                                )}
-                              </div>
-                            </div>
-                          </div>
-                        </div>
-
-                        {/* Resumo por Direção e Departamento (Hierarchical Breakdown) */}
-                        <div className="mb-3 bg-white rounded-[2rem] border border-slate-200 overflow-hidden shadow-xl shadow-slate-100/50 print:hidden">
-                          <div className="bg-slate-900 p-5 flex items-center justify-between">
-                            <div className="flex items-center gap-3">
-                              <div className="p-2 bg-indigo-500/20 rounded-xl">
-                                <TrendingUp
-                                  size={20}
-                                  className="text-indigo-400"
-                                />
-                              </div>
-                              <h4 className="text-xs font-black uppercase tracking-[0.2em] text-white">
-                                Hierarquia Orçamental Institucional
-                              </h4>
-                            </div>
-                            <span className="text-[10px] font-bold text-slate-400 italic">
-                              Consolidação por Direção e Departamento
+                            <span className="text-xs font-black uppercase border border-slate-300 py-1.5 px-3.5 text-slate-800 bg-white rounded-lg whitespace-nowrap shadow-sm">
+                              PESOE: {selectedYear}
                             </span>
-                          </div>
-                          <div className="p-8 space-y-8">
-                            {Object.entries(
-                              filteredActivities
-                                .filter(
-                                  (a) => (a.status as any) === "institucional",
-                                )
-                                .reduce(
-                                  (acc, act) => {
-                                    const dir =
-                                      act.direcao || "ADMINISTRAÇÃO GERAL";
-                                    const dept =
-                                      act.departamento || "GERAL / OUTROS";
-                                    if (!acc[dir])
-                                      acc[dir] = { total: 0, depts: {} };
-                                    if (!acc[dir].depts[dept])
-                                      acc[dir].depts[dept] = 0;
-                                    const val = getActivityTotal(act);
-                                    acc[dir].total += val;
-                                    acc[dir].depts[dept] += val;
-                                    return acc;
-                                  },
-                                  {} as Record<
-                                    string,
-                                    {
-                                      total: number;
-                                      depts: Record<string, number>;
-                                    }
-                                  >,
-                                ),
-                            ).map(
-                              ([dir, data]: [
-                                string,
-                                {
-                                  total: number;
-                                  depts: Record<string, number>;
-                                },
-                              ]) => (
-                                <div
-                                  key={dir}
-                                  className="border-b border-slate-100 last:border-0 pb-8 last:pb-0"
-                                >
-                                  <div className="flex flex-col md:flex-row md:items-end justify-between mb-4 gap-4">
-                                    <div>
-                                      <p className="text-[10px] uppercase font-black text-indigo-600 mb-1 tracking-widest">
-                                        DIREÇÃO
-                                      </p>
-                                      <h5 className="text-xl font-black text-slate-900">
-                                        {dir}
-                                      </h5>
-                                    </div>
-                                    <div className="md:text-right bg-slate-50 px-4 py-2 rounded-2xl border border-slate-100">
-                                      <p className="text-[9px] uppercase font-black text-slate-400 mb-0.5 tracking-widest">
-                                        TOTAL DIREÇÃO
-                                      </p>
-                                      <p className="text-2xl font-black text-slate-900 tracking-tighter">
-                                        {data.total.toLocaleString("pt-MZ", {
-                                          minimumFractionDigits: 2,
-                                          maximumFractionDigits: 2,
-                                        })}{" "}
-                                        <span className="text-sm font-bold text-slate-400">
-                                          MZN
-                                        </span>
-                                      </p>
-                                    </div>
-                                  </div>
-                                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                                    {Object.entries(
-                                      data.depts as Record<string, number>,
-                                    ).map(([dept, total]) => (
-                                      <div
-                                        key={dept}
-                                        className="bg-slate-50/50 p-4 rounded-2xl border border-slate-100 hover:border-indigo-100 transition-colors"
-                                      >
-                                        <p
-                                          className="text-[9px] uppercase font-bold text-slate-500 mb-1 truncate"
-                                          title={dept}
-                                        >
-                                          {dept}
-                                        </p>
-                                        <p className="text-sm font-black text-slate-800">
-                                          {total.toLocaleString("pt-MZ", {
-                                            minimumFractionDigits: 2,
-                                            maximumFractionDigits: 2,
-                                          })}{" "}
-                                          <span className="text-[10px] text-slate-400">
-                                            MZN
-                                          </span>
-                                        </p>
-                                      </div>
-                                    ))}
-                                  </div>
-                                </div>
-                              ),
-                            )}
-                          </div>
-                          <div className="bg-indigo-600 p-6 flex justify-between items-center">
-                            <div className="flex items-center gap-3 text-white/80">
-                              <LayoutGrid size={24} />
-                              <span className="text-xs font-black uppercase tracking-[0.2em]">
-                                Resumo Geral Institucional
-                              </span>
-                            </div>
-                            <div className="text-right">
-                              <p className="text-[10px] font-black uppercase tracking-widest text-indigo-200 mb-1">
-                                Orçamento Total Consolidado
-                              </p>
-                              <p className="text-3xl font-black text-white tracking-tighter">
-                                {(
-                                  filteredActivities
-                                    .filter(
-                                      (a) =>
-                                        (a.status as any) === "institucional",
-                                    )
-                                    .reduce(
-                                      (sum, act) => sum + getActivityTotal(act),
-                                      0,
-                                    ) as number
-                                ).toLocaleString("pt-MZ", {
-                                  minimumFractionDigits: 2,
-                                  maximumFractionDigits: 2,
-                                })}{" "}
-                                <span className="text-sm font-bold opacity-60">
-                                  MZN
-                                </span>
-                              </p>
-                            </div>
-                          </div>
-                        </div>
-
-                        {/* NOVO: Resumo Consolidado por Rúbrica (Rubricas Mães) */}
-                        <div className="mb-3 bg-white rounded-[2rem] border border-slate-200 overflow-hidden shadow-xl shadow-slate-100/50 print:hidden">
-                          <div className="bg-slate-900 p-5 flex items-center justify-between">
-                            <div className="flex items-center gap-3">
-                              <div className="p-2 bg-emerald-500/20 rounded-xl">
-                                <TrendingUp
-                                  size={20}
-                                  className="text-emerald-400"
-                                />
-                              </div>
-                              <h4 className="text-xs font-black uppercase tracking-[0.2em] text-white">
-                                Resumo Consolidado por Rúbrica (Materiais, Serviços, Ajudas de Custo)
-                              </h4>
-                            </div>
-                          </div>
-                          <div className="p-8">
-                             <p className="text-xs text-slate-500 italic mb-6">Agrupado por Rúbricas Mães (somatório consolidado de todas as rubricas usadas).</p>
-                             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                                {
-                                  Object.values(
-                                    filteredActivities
-                                      .filter((a) => (a.status as any) === "institucional")
-                                      .reduce((acc, act) => {
-                                         const rawRubrica = act.rubrica || (Array.isArray(act.rubricas) && act.rubricas[0]?.rubrica) || "Geral";
-                                         const parent = getParentRubrica(rawRubrica);
-                                         if (!acc[parent]) {
-                                           acc[parent] = { parentName: parent, total: 0, count: 0 };
-                                         }
-                                         const actVal = getActivityTotal(act);
-                                         acc[parent].total += actVal;
-                                         acc[parent].count += 1;
-                                         if (Array.isArray(act.rubricas)) {
-                                           act.rubricas.forEach((r: any) => {
-                                             acc[parent].total += Number(r.valorTotal || r.valor || 0);
-                                           });
-                                         }
-                                         return acc;
-                                      }, {} as Record<string, { parentName: string; total: number; count: number }>)
-                                  ).map((group: { parentName: string; total: number; count: number }) => (
-                                    <div key={group.parentName} className="bg-slate-50 p-4 rounded-2xl border border-slate-100 flex flex-col justify-between">
-                                      <div>
-                                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-wider">Rúbrica Mãe</p>
-                                        <p className="text-sm font-black text-blue-950 mt-1">{group.parentName}</p>
-                                        <p className="text-[11px] text-slate-500 mt-2">{group.count} atividades associadas</p>
-                                      </div>
-                                      <p className="text-base font-black text-emerald-600 mt-4 pt-3 border-t border-slate-200/60">
-                                         {group.total.toLocaleString("pt-MZ", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} <span className="text-[10px]">MZN</span>
-                                      </p>
-                                    </div>
-                                  ))
-                                }
-                             </div>
                           </div>
                         </div>
 
@@ -7568,63 +7188,7 @@ export default function PlanoWorkflowView({
                                   </React.Fragment>
                                 );
                               })}
-                              {/* Linhas Vazias de Preenchimento para Estética */}
-                              {Array.from({
-                                length: Math.max(
-                                  0,
-                                  15 - filteredActivities.length,
-                                ),
-                              }).map((_, i) => (
-                                <tr
-                                  key={`empty-pesoe-${i}`}
-                                  className="h-10 border-b border-slate-300 bg-[#eff3f8]"
-                                >
-                                  {Array.from({ length: 37 }).map((__, j) => (
-                                    <td
-                                      key={j}
-                                      className={`border-r border-slate-300 ${j === 0 ? "bg-[#c6d9f1]" : ""}`}
-                                    ></td>
-                                  ))}
-                                </tr>
-                              ))}
                             </tbody>
-                            <tfoot className="print:table-footer-group">
-                              <tr className="bg-slate-100 font-black border-t-2 border-slate-900">
-                                <td
-                                  colSpan={32}
-                                  className="p-4 text-right uppercase tracking-wider"
-                                >
-                                  TOTAL DE CONSOLIDADO
-                                </td>
-                                <td className="p-4 text-right text-base text-[#121c60]">
-                                  MZN{" "}
-                                  {filteredActivities
-                                    .filter(
-                                      (a) =>
-                                        (a.status as any) === "institucional",
-                                    )
-                                    .filter((a) => {
-                                      if (isChefeDPEP) return true;
-                                      if (directorDirection === "ALL")
-                                        return true;
-                                      if (!directorDirection) return true;
-                                      return (a.direcao || "")
-                                        .toUpperCase()
-                                        .includes(
-                                          directorDirection.toUpperCase(),
-                                        );
-                                    })
-                                    .reduce(
-                                      (sum, current) =>
-                                        sum + getActivityTotal(current),
-                                      0,
-                                    )
-                                    .toLocaleString("pt-MZ", {
-                                      minimumFractionDigits: 2,
-                                    })}
-                                </td>
-                              </tr>
-                            </tfoot>
                           </table>
                         </div>
 
@@ -7647,6 +7211,214 @@ export default function PlanoWorkflowView({
                       </div>
                     </div>
                   )}
+                </div>
+              </div>
+            )}
+
+            {/* --- LEVEL 5: CHEFE DO DPEP (Validação e Envio ao Órgão Colegial) --- */}
+            {selectedRoleMode === "Chefe DPEP" && (
+              <div className="p-8 md:p-12 space-y-8 flex-1 bg-white">
+                <InstitutionalHeader
+                  unidadeName="Instituto Superior Politécnico de Songo"
+                  direcaoName="Direção de Planificação, Estudos e Projetos"
+                  departamentoName="Gabinete do Chefe do DPEP"
+                  year={selectedYear}
+                  isOwner={true}
+                />
+
+                <div className="bg-gradient-to-r from-blue-900 via-indigo-900 to-slate-900 text-white rounded-3xl p-6 md:p-8 shadow-xl border border-indigo-700/50 space-y-6">
+                  <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6 border-b border-white/10 pb-6">
+                    <div>
+                      <span className="text-[10px] font-black uppercase tracking-widest text-amber-400 bg-amber-400/10 px-3 py-1 rounded-full border border-amber-400/20">
+                        Apreciação do Chefe do DPEP
+                      </span>
+                      <h3 className="text-2xl font-black mt-2 text-white uppercase tracking-tight font-serif">
+                        Proposta do Plano Institucional (PESOE {selectedYear})
+                      </h3>
+                      <p className="text-xs text-slate-300 mt-1 max-w-2xl">
+                        O Setor de Planificação consolidou todas as atividades das 5 Direções. Como Chefe do DPEP, valide a proposta e envie-a para apreciação e homologação do Órgão Colegial.
+                      </p>
+                    </div>
+                    <button
+                      onClick={handleSendChefeDPEPToOrgaoColegial}
+                      className="bg-amber-500 hover:bg-amber-600 text-slate-950 font-black px-6 py-3.5 rounded-2xl text-xs uppercase tracking-wider transition-all flex items-center gap-2 shadow-lg shadow-amber-500/20 whitespace-nowrap"
+                    >
+                      <Send size={16} strokeWidth={2.5} /> Enviar Proposta ao Órgão Colegial
+                    </button>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                    <div className="bg-white/5 border border-white/10 p-4 rounded-2xl">
+                      <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Total de Atividades</span>
+                      <span className="text-2xl font-black text-white font-mono">{filteredActivities.length}</span>
+                    </div>
+                    <div className="bg-white/5 border border-white/10 p-4 rounded-2xl">
+                      <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Orçamento Atividades</span>
+                      <span className="text-2xl font-black text-amber-400 font-mono">
+                        {filteredActivities.reduce((acc, a) => acc + getActivityTotal(a), 0).toLocaleString("pt-MZ", { minimumFractionDigits: 2 })} MZN
+                      </span>
+                    </div>
+                    <div className="bg-white/5 border border-white/10 p-4 rounded-2xl">
+                      <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Direções Integradas</span>
+                      <span className="text-2xl font-black text-emerald-400 font-mono">5 / 5</span>
+                    </div>
+                    <div className="bg-white/5 border border-white/10 p-4 rounded-2xl">
+                      <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Destino da Proposta</span>
+                      <span className="text-sm font-black text-slate-200 uppercase mt-1 block">Órgão Colegial</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Tabela do Plano Institucional para Validação do Chefe do DPEP */}
+                <div className="bg-white border border-slate-200 rounded-3xl overflow-hidden shadow-sm">
+                  <div className="bg-slate-900 text-white p-5 flex justify-between items-center">
+                    <div>
+                      <h4 className="text-base font-black uppercase tracking-wide">
+                        Matriz Geral de Atividades Consolidadas
+                      </h4>
+                      <p className="text-[10px] text-slate-400">Atividades prontas para encaminhamento ao Órgão Colegial</p>
+                    </div>
+                    <span className="text-xs font-mono font-bold text-amber-400">
+                      {filteredActivities.length} Atividades Registadas
+                    </span>
+                  </div>
+                  <div className="overflow-x-auto print:overflow-visible">
+                    <table className="w-full text-left border-collapse min-w-[1900px] font-sans text-xs">
+                      <ActivityTableHeader isDPEP={true} />
+                      <tbody className="divide-y divide-slate-200 text-slate-700 font-medium whitespace-nowrap">
+                        {filteredActivities.map((act, idx) => (
+                          <ActivityTableRow
+                            key={act.id}
+                            activity={act}
+                            onViewHistory={setActivityForHistory}
+                            index={idx}
+                            isDPEP={true}
+                            user={user}
+                            isBossOrAdmin={true}
+                            getActivityTotal={getActivityTotal}
+                            onUpdateExecution={onUpdateExecution}
+                            onUpdateRelatorio={onUpdateRelatorio}
+                            actions={
+                              <div className="flex justify-center items-center gap-2">
+                                <button
+                                  onClick={() => {
+                                    setEditingActivity(act);
+                                    setShowAddForm(true);
+                                  }}
+                                  className="p-1 text-slate-400 hover:text-blue-600 hover:bg-slate-100 rounded"
+                                  title="Visualizar"
+                                >
+                                  <Eye size={13} />
+                                </button>
+                              </div>
+                            }
+                          />
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* --- LEVEL 6: ÓRGÃO COLEGIAL (Deliberação e Homologação Final) --- */}
+            {selectedRoleMode === "Órgão Colegial" && (
+              <div className="p-8 md:p-12 space-y-8 flex-1 bg-white">
+                <InstitutionalHeader
+                  unidadeName="Instituto Superior Politécnico de Songo"
+                  direcaoName="Conselho de Direção"
+                  departamentoName="Órgão Colegial de Deliberação"
+                  year={selectedYear}
+                  isOwner={true}
+                />
+
+                <div className="bg-gradient-to-r from-emerald-950 via-slate-900 to-emerald-950 text-white rounded-3xl p-6 md:p-8 shadow-xl border border-emerald-800/50 space-y-6">
+                  <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6 border-b border-white/10 pb-6">
+                    <div>
+                      <span className="text-[10px] font-black uppercase tracking-widest text-emerald-400 bg-emerald-400/10 px-3 py-1 rounded-full border border-emerald-400/20">
+                        Deliberação Colegial
+                      </span>
+                      <h3 className="text-2xl font-black mt-2 text-white uppercase tracking-tight font-serif">
+                        Apreciação e Aprovação Final do PESOE {selectedYear}
+                      </h3>
+                      <p className="text-xs text-slate-300 mt-1 max-w-2xl">
+                        Proposta submetida pelo Chefe do DPEP para apreciação em sede do Conselho de Direção / Órgão Colegial. Clique para aprovar e homologar o plano institucional.
+                      </p>
+                    </div>
+                    <button
+                      onClick={handleOrgaoColegialAprovar}
+                      className="bg-emerald-500 hover:bg-emerald-600 text-white font-black px-6 py-3.5 rounded-2xl text-xs uppercase tracking-wider transition-all flex items-center gap-2 shadow-lg shadow-emerald-500/20 whitespace-nowrap"
+                    >
+                      <CheckCircle2 size={16} strokeWidth={2.5} /> Aprovar & Homologar PESOE {selectedYear}
+                    </button>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                    <div className="bg-white/5 border border-white/10 p-4 rounded-2xl">
+                      <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Atividades Institucionais</span>
+                      <span className="text-2xl font-black text-white font-mono">{filteredActivities.length}</span>
+                    </div>
+                    <div className="bg-white/5 border border-white/10 p-4 rounded-2xl">
+                      <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Orçamento Geral Aprovado</span>
+                      <span className="text-2xl font-black text-emerald-400 font-mono">
+                        {filteredActivities.reduce((acc, a) => acc + getActivityTotal(a), 0).toLocaleString("pt-MZ", { minimumFractionDigits: 2 })} MZN
+                      </span>
+                    </div>
+                    <div className="bg-white/5 border border-white/10 p-4 rounded-2xl">
+                      <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Estado da Homologação</span>
+                      <span className="text-sm font-black text-emerald-300 uppercase mt-1 block">Pronto para Homologação</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Tabela do Plano para o Órgão Colegial */}
+                <div className="bg-white border border-slate-200 rounded-3xl overflow-hidden shadow-sm">
+                  <div className="bg-slate-900 text-white p-5 flex justify-between items-center">
+                    <div>
+                      <h4 className="text-base font-black uppercase tracking-wide">
+                        Plano Económico, Social e Orçamento da Entidade (PESOE)
+                      </h4>
+                      <p className="text-[10px] text-slate-400">Todas as atividades apreciadas pelo Conselho de Direção</p>
+                    </div>
+                    <span className="text-xs font-mono font-bold text-emerald-400">
+                      {filteredActivities.length} Atividades
+                    </span>
+                  </div>
+                  <div className="overflow-x-auto print:overflow-visible">
+                    <table className="w-full text-left border-collapse min-w-[1900px] font-sans text-xs">
+                      <ActivityTableHeader isDPEP={true} />
+                      <tbody className="divide-y divide-slate-200 text-slate-700 font-medium whitespace-nowrap">
+                        {filteredActivities.map((act, idx) => (
+                          <ActivityTableRow
+                            key={act.id}
+                            activity={act}
+                            onViewHistory={setActivityForHistory}
+                            index={idx}
+                            isDPEP={true}
+                            user={user}
+                            isBossOrAdmin={true}
+                            getActivityTotal={getActivityTotal}
+                            onUpdateExecution={onUpdateExecution}
+                            onUpdateRelatorio={onUpdateRelatorio}
+                            actions={
+                              <div className="flex justify-center items-center gap-2">
+                                <button
+                                  onClick={() => {
+                                    setEditingActivity(act);
+                                    setShowAddForm(true);
+                                  }}
+                                  className="p-1 text-slate-400 hover:text-blue-600 hover:bg-slate-100 rounded"
+                                  title="Visualizar"
+                                >
+                                  <Eye size={13} />
+                                </button>
+                              </div>
+                            }
+                          />
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
                 </div>
               </div>
             )}
@@ -7797,16 +7569,22 @@ export default function PlanoWorkflowView({
                           data.unidadeSelecionada ||
                           data.direcao ||
                           editingActivity?.direcao ||
-                          "",
+                          user?.direcao ||
+                          user?.servicoCentral ||
+                          "Direção Geral",
                         departamento:
                           data.departamento ||
                           editingActivity?.departamento ||
-                          "",
+                          user?.departamento ||
+                          "Departamento Geral",
                         reparticao:
                           data.reparticao ||
+                          data.setor ||
                           editingActivity?.reparticao ||
+                          user?.reparticao ||
+                          user?.setor ||
                           title ||
-                          "Repartição de Transporte",
+                          "Repartição Geral",
                         orcamento:
                           data.fonteReceita ||
                           mainRubric ||
@@ -7887,7 +7665,16 @@ export default function PlanoWorkflowView({
                         valorTotalGasoleo: Number(data.valorTotalGasoleo || 0),
                         prioridadeProposta: data.prioridadeProposta || "",
                         codigoAtividade: data.codigoAtividade || "",
-                        setor: data.setor || "",
+                        setor:
+                          data.setor ||
+                          data.reparticao ||
+                          editingActivity?.setor ||
+                          user?.setor ||
+                          user?.sector ||
+                          user?.seccao ||
+                          user?.reparticao ||
+                          title ||
+                          "Setor Geral",
                         curso: data.curso || "",
                         requiresUpdate: false,
                         ano: (editingActivity && editingActivity.id && !data._forceNewRecord)
@@ -8423,11 +8210,13 @@ export default function PlanoWorkflowView({
                             const { toStatus } = workflowToProcess;
                             
                             let options: string[] = [];
-                            if (toStatus === "reparticao") options = [user?.reparticao];
-                            else if (toStatus === "departamento") options = [user?.departamento];
-                            else if (toStatus === "direcao") options = [user?.direcao];
-                            else if (toStatus === "planificacao") options = ["Direção de Planificação e Estudos (DPEP)"];
-                            else if (toStatus === "institucional") options = ["Conselho de Direção", "Gabinete do Diretor Geral"];
+                            if (toStatus === "reparticao") options = [user?.reparticao || "Chefe da Repartição"];
+                            else if (toStatus === "departamento") options = [user?.departamento || "Chefe do Departamento"];
+                            else if (toStatus === "direcao") options = [user?.direcao || "Diretor da Direção"];
+                            else if (toStatus === "planificacao") options = ["Setor de Planificação (DPEP)"];
+                            else if (toStatus === "dpep_chefe") options = ["Gabinete do Chefe do DPEP", "Chefe do DPEP"];
+                            else if (toStatus === "orgao_colegial") options = ["Conselho de Direção / Órgão Colegial"];
+                            else if (toStatus === "institucional") options = ["Conselho de Direção", "Gabinete do Diretor Geral", "Arquivo Geral"];
                             
                             const validOptions = options.filter(o => o && o.trim() !== "");
                             return validOptions.length > 0 ? validOptions.map(g => (

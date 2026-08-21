@@ -224,28 +224,16 @@ export default function App() {
   }, []);
 
   const handleSyncData = async () => {
-    if (!isSuperBossUser(extendedUser)) return;
-    if (
-      !window.confirm(
-        `Deseja sincronizar ${EFETIVO_GERAL_DATA.length} colaboradores com o Firestore?`,
-      )
-    )
-      return;
-
-    setModalMessage("Sincronizando dados dos colaboradores...");
+    setModalMessage("Sincronizando todos os dados com o servidor remoto (Firestore)...");
     try {
-      const result =
+      const res = await firestoreService.ensureCloudDataInitialized();
+      if (isSuperBossUser(extendedUser)) {
         await firestoreService.seedAllCollaborators(EFETIVO_GERAL_DATA);
-      if (result.success) {
-        setModalMessage(
-          `Sucesso! ${result.count} colaboradores sincronizados.`,
-        );
-      } else {
-        setModalMessage("Erro ao sincronizar dados.");
       }
+      setModalMessage("✅ Sucesso! Todos os dados e planos de atividades estão sincronizados com a nuvem e acessíveis em qualquer computador.");
     } catch (error) {
       console.error(error);
-      setModalMessage("Erro inesperado durante a sincronização.");
+      setModalMessage("Erro ao sincronizar dados com o servidor remoto.");
     }
   };
 
@@ -481,14 +469,14 @@ export default function App() {
     seedData();
   }, [authReady]);
 
-  // Sincronização automática de dados locais pendentes ao iniciar o sistema
+  // Sincronização automática de dados locais e garantia de persistência na nuvem
   useEffect(() => {
     if (authReady) {
       const syncTimer = setTimeout(() => {
-        firestoreService.syncAllLocalData().catch((err) => {
-          console.warn("Erro na sincronização automática inicial:", err);
+        firestoreService.ensureCloudDataInitialized().catch((err) => {
+          console.warn("Erro na sincronização em nuvem automática inicial:", err);
         });
-      }, 5000); // Aguarda 5 segundos para não sobrecarregar o boot inicial
+      }, 1000);
       return () => clearTimeout(syncTimer);
     }
   }, [authReady]);

@@ -16,6 +16,8 @@ import {
   MailOpen,
   CheckCheck,
   ShieldCheck,
+  ChevronLeft,
+  ChevronRight,
 } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import { Colaborador, Message } from "../../types";
@@ -36,6 +38,7 @@ export default function CaixaMensagensView({
   colaboradores = [],
 }: CaixaMensagensViewProps) {
   const [viewMode, setViewMode] = useState<ViewMode>("entrada");
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [allMessages, setAllMessages] = useState<Message[]>([]);
   const [newMessage, setNewMessage] = useState("");
   const [subject, setSubject] = useState("");
@@ -454,10 +457,24 @@ export default function CaixaMensagensView({
   };
 
   return (
-    <div className="h-full flex bg-white overflow-hidden min-h-0 w-full">
+    <div className="h-full flex bg-white overflow-hidden min-h-0 w-full relative">
       {/* Sidebar de Navegação */}
-      <div className="w-64 bg-gray-50 border-r flex flex-col shrink-0 h-full">
-        <div className="p-4">
+      <div
+        className={`bg-gray-50 border-r flex flex-col shrink-0 h-full relative transition-all duration-300 ${
+          isSidebarCollapsed ? "w-16 p-2" : "w-64"
+        }`}
+      >
+        {/* Botão de minimização/maximização centrado no limite do submenu lateral */}
+        <button
+          type="button"
+          onClick={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
+          title={isSidebarCollapsed ? "Maximizar Menu Lateral" : "Minimizar Menu Lateral"}
+          className="hidden md:flex absolute top-1/2 -translate-y-1/2 -right-3.5 z-40 w-7 h-7 bg-white text-slate-800 hover:bg-blue-600 hover:text-white rounded-full border-2 border-slate-300 hover:border-blue-600 shadow-xl items-center justify-center transition-all duration-300 transform hover:scale-110 focus:outline-none cursor-pointer"
+        >
+          {isSidebarCollapsed ? <ChevronRight size={16} /> : <ChevronLeft size={16} />}
+        </button>
+
+        <div className={isSidebarCollapsed ? "p-1" : "p-4"}>
           <button
             onClick={() => {
               setViewMode("nova");
@@ -466,33 +483,45 @@ export default function CaixaMensagensView({
               setTargetRecipients([]);
               setSearch("");
             }}
-            className="w-full py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold flex items-center justify-center gap-2 shadow-lg shadow-blue-200 transition-all active:scale-95"
+            title="Nova Mensagem"
+            className={`w-full py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold flex items-center justify-center gap-2 shadow-lg shadow-blue-200 transition-all active:scale-95 ${
+              isSidebarCollapsed ? "px-0" : ""
+            }`}
           >
-            <Plus size={18} />
-            Nova Mensagem
+            <Plus size={18} className="shrink-0" />
+            {!isSidebarCollapsed && <span>Nova Mensagem</span>}
           </button>
         </div>
 
-        <nav className="flex-1 px-3 space-y-1">
+        <nav className={`flex-1 space-y-1 ${isSidebarCollapsed ? "px-1" : "px-3"}`}>
           <button
             onClick={() => setViewMode("entrada")}
-            className={`w-full p-3 flex items-center gap-3 rounded-xl font-bold text-sm transition-colors ${viewMode === "entrada" ? "bg-blue-50 text-blue-600" : "text-gray-500 hover:bg-gray-100"}`}
+            title="Entrada"
+            className={`w-full p-3 flex items-center gap-3 rounded-xl font-bold text-sm transition-colors ${
+              isSidebarCollapsed ? "justify-center px-0" : ""
+            } ${viewMode === "entrada" ? "bg-blue-50 text-blue-600" : "text-gray-500 hover:bg-gray-100"}`}
           >
-            <Inbox size={20} />
-            Entrada
-            {inboxGroups.reduce((acc, curr) => acc + curr.unreadCount, 0) >
-              0 && (
-              <span className="ml-auto bg-blue-600 text-white text-[10px] px-2 py-0.5 rounded-full">
+            <Inbox size={20} className="shrink-0" />
+            {!isSidebarCollapsed && <span>Entrada</span>}
+            {inboxGroups.reduce((acc, curr) => acc + curr.unreadCount, 0) > 0 && (
+              <span
+                className={`${
+                  isSidebarCollapsed ? "absolute top-2 right-2 text-[8px] px-1" : "ml-auto text-[10px] px-2 py-0.5"
+                } bg-blue-600 text-white rounded-full font-black`}
+              >
                 {inboxGroups.reduce((acc, curr) => acc + curr.unreadCount, 0)}
               </span>
             )}
           </button>
           <button
             onClick={() => setViewMode("saida")}
-            className={`w-full p-3 flex items-center gap-3 rounded-xl font-bold text-sm transition-colors ${viewMode === "saida" ? "bg-blue-50 text-blue-600" : "text-gray-500 hover:bg-gray-100"}`}
+            title="Saída"
+            className={`w-full p-3 flex items-center gap-3 rounded-xl font-bold text-sm transition-colors ${
+              isSidebarCollapsed ? "justify-center px-0" : ""
+            } ${viewMode === "saida" ? "bg-blue-50 text-blue-600" : "text-gray-500 hover:bg-gray-100"}`}
           >
-            <SendHorizontal size={20} />
-            Saída
+            <SendHorizontal size={20} className="shrink-0" />
+            {!isSidebarCollapsed && <span>Saída</span>}
           </button>
         </nav>
 

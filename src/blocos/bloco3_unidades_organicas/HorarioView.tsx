@@ -16,6 +16,7 @@ import {
 import { ProcessingCircle } from "../../components/ui/ProcessingCircle";
 import { firestoreService } from "../../lib/firestoreService";
 import { printElementById } from "../../lib/printUtils";
+import { loadAllDocentes } from "../../lib/allocationUtils";
 
 interface TimeSlot {
   start: string;
@@ -43,7 +44,7 @@ export default function HorarioView({ title, user }: { title: string; user: any 
 
   useEffect(() => {
     const unsubDocentes = firestoreService.colaboradores.subscribe((data) => {
-      setDocentes((data || []).filter((d: any) => d.tipo === "Docente"));
+      setDocentes(loadAllDocentes(data || []));
     });
 
     const unsubSalas = firestoreService.espacos_fisicos.subscribe((data) => {

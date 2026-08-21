@@ -138,9 +138,12 @@ export default function GestaoProdutosPrecosView() {
     // 3. Necessidade
     if (filterNecessidade !== "TODAS") {
       const pCodeNec = formatNecessidadeWithCode(p.necessidade || "", p.rubrica);
+      const cleanFilterNec = filterNecessidade.replace(/^\d+\s*[-_.]?\s*/, "").trim().toLowerCase();
+      const cleanPNec = (p.necessidade || "").replace(/^\d+\s*[-_.]?\s*/, "").trim().toLowerCase();
       const matchNec =
         (p.necessidade || "").trim().toLowerCase() === filterNecessidade.trim().toLowerCase() ||
-        pCodeNec.trim().toLowerCase() === filterNecessidade.trim().toLowerCase();
+        pCodeNec.trim().toLowerCase() === filterNecessidade.trim().toLowerCase() ||
+        (cleanFilterNec && cleanPNec && (cleanFilterNec === cleanPNec || cleanFilterNec.includes(cleanPNec) || cleanPNec.includes(cleanFilterNec)));
       if (!matchNec) return false;
     }
 
@@ -541,16 +544,135 @@ export default function GestaoProdutosPrecosView() {
         ) : (
           /* AGRUPADO POR RÚBRICA & NECESSIDADE */
           <div className="space-y-6">
+            {/* Directório Interativo de Grupos de Necessidades */}
+            <div className="bg-slate-900 text-white p-6 rounded-3xl space-y-4 shadow-lg border border-slate-800">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-800 pb-3">
+                <div className="flex items-center gap-2">
+                  <FolderTree className="w-5 h-5 text-blue-400" />
+                  <h3 className="text-sm font-black text-white font-serif tracking-wide">
+                    Directório de Grupos de Necessidades
+                  </h3>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="text-[11px] font-bold text-slate-400">
+                    💡 Clique em qualquer necessidade para isolar os seus produtos
+                  </span>
+                  {filterNecessidade !== "TODAS" && (
+                    <button
+                      onClick={() => setFilterNecessidade("TODAS")}
+                      className="px-3 py-1 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-[10px] font-black uppercase tracking-wider transition-all flex items-center gap-1"
+                    >
+                      <X className="w-3 h-3" /> Ver Todos os Grupos
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              {/* Grid de Cartões de Necessidades */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2.5">
+                {availableFilterNecessidades.map((formattedNec, idx) => {
+                  const cleanFormatted = formattedNec.replace(/^\d+\s*[-_.]?\s*/, "").trim().toLowerCase();
+                  const isSelected =
+                    filterNecessidade !== "TODAS" &&
+                    (filterNecessidade.trim().toLowerCase() === formattedNec.trim().toLowerCase() ||
+                      filterNecessidade.replace(/^\d+\s*[-_.]?\s*/, "").trim().toLowerCase() === cleanFormatted);
+
+                  const countProds = products.filter((p) => {
+                    const pCodeNec = formatNecessidadeWithCode(p.necessidade || "", p.rubrica);
+                    const cleanP = (p.necessidade || "").replace(/^\d+\s*[-_.]?\s*/, "").trim().toLowerCase();
+                    return (
+                      (p.necessidade || "").trim().toLowerCase() === formattedNec.trim().toLowerCase() ||
+                      pCodeNec.trim().toLowerCase() === formattedNec.trim().toLowerCase() ||
+                      (cleanP && cleanP === cleanFormatted)
+                    );
+                  }).length;
+
+                  return (
+                    <button
+                      key={idx}
+                      type="button"
+                      onClick={() => {
+                        if (isSelected) {
+                          setFilterNecessidade("TODAS");
+                        } else {
+                          setFilterNecessidade(formattedNec);
+                        }
+                      }}
+                      className={`p-3 rounded-2xl text-left border transition-all flex flex-col justify-between gap-2 group ${
+                        isSelected
+                          ? "bg-blue-600 text-white border-blue-400 shadow-lg shadow-blue-500/30 ring-2 ring-blue-300"
+                          : "bg-slate-800/80 hover:bg-slate-800 text-slate-200 border-slate-700/80 hover:border-blue-500/50"
+                      }`}
+                    >
+                      <div className="flex items-start justify-between gap-1.5">
+                        <span className="text-xs font-bold leading-tight group-hover:text-white transition-colors">
+                          {formattedNec}
+                        </span>
+                        {isSelected && <Check className="w-4 h-4 text-emerald-300 shrink-0" />}
+                      </div>
+                      <div className="flex items-center justify-between text-[10px] pt-1 border-t border-white/10">
+                        <span className={isSelected ? "text-blue-100 font-medium" : "text-slate-400"}>
+                          {countProds} {countProds === 1 ? "produto" : "produtos"}
+                        </span>
+                        <span className={`font-black uppercase tracking-wider text-[9px] ${isSelected ? "text-white" : "text-blue-400"}`}>
+                          {isSelected ? "Ativo" : "Selecionar"}
+                        </span>
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Banner Informativo do Grupo Ativo */}
+            {filterNecessidade !== "TODAS" && (
+              <div className="bg-blue-50 border-2 border-blue-200 text-blue-950 p-4 rounded-2xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-sm animate-fade-in">
+                <div className="flex items-center gap-3">
+                  <div className="p-2.5 bg-blue-600 text-white rounded-xl shadow-md">
+                    <FolderTree className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <span className="text-[10px] font-black uppercase tracking-wider text-blue-700 block">
+                      Grupo de Necessidade Selecionado Exclusivamente
+                    </span>
+                    <h4 className="text-sm font-black font-serif text-blue-950">
+                      {filterNecessidade}
+                    </h4>
+                    <p className="text-[11px] text-blue-800 font-medium">
+                      Exibindo estritamente os {filteredProducts.length} produto(s) pertencente(s) a esta necessidade.
+                    </p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setFilterNecessidade("TODAS")}
+                  className="px-4 py-2 bg-white hover:bg-blue-100 text-blue-900 font-black rounded-xl text-xs border border-blue-300 transition-all shrink-0 shadow-sm flex items-center gap-1.5"
+                >
+                  <X className="w-4 h-4 text-blue-700" />
+                  <span>Ver Todos os Grupos</span>
+                </button>
+              </div>
+            )}
+
+            {/* Lista por Rúbricas & Necessidades */}
             {RUBRICAS.filter((r) => filterRubrica === "TODAS" || r === filterRubrica).map((rubricaName) => {
-                            const necessidadesList = getNecessidadesOptions(rubricaName);
+              const necessidadesList = getNecessidadesOptions(rubricaName);
               
               let filteredNecessidadesList = necessidadesList;
               if (filterNecessidade !== "TODAS") {
                 filteredNecessidadesList = necessidadesList.filter((necName) => {
                   const formattedNec = formatNecessidadeWithCode(necName, rubricaName);
+                  const cleanFilter = filterNecessidade.replace(/^\d+\s*[-_.]?\s*/, "").trim().toLowerCase();
+                  const cleanNec = necName.replace(/^\d+\s*[-_.]?\s*/, "").trim().toLowerCase();
+                  const cleanFormatted = formattedNec.replace(/^\d+\s*[-_.]?\s*/, "").trim().toLowerCase();
+
                   return (
                     necName.trim().toLowerCase() === filterNecessidade.trim().toLowerCase() ||
-                    formattedNec.trim().toLowerCase() === filterNecessidade.trim().toLowerCase()
+                    formattedNec.trim().toLowerCase() === filterNecessidade.trim().toLowerCase() ||
+                    cleanFilter === cleanNec ||
+                    cleanFilter === cleanFormatted ||
+                    cleanFilter.includes(cleanNec) ||
+                    cleanNec.includes(cleanFilter)
                   );
                 });
               }
@@ -560,7 +682,7 @@ export default function GestaoProdutosPrecosView() {
               );
 
               if (filteredNecessidadesList.length === 0) return null;
-              if (rubricaProducts.length === 0 && filterRubrica !== "TODAS") return null;
+              if (rubricaProducts.length === 0 && filterRubrica !== "TODAS" && filterNecessidade !== "TODAS") return null;
 
               return (
                 <div key={rubricaName} className="border border-gray-200 rounded-3xl p-6 space-y-4 bg-gray-50/50">
@@ -576,42 +698,84 @@ export default function GestaoProdutosPrecosView() {
 
                   <div className="space-y-4">
                     {filteredNecessidadesList.map((necName) => {
+                      const formattedNec = formatNecessidadeWithCode(necName, rubricaName);
+                      const cleanNecName = necName.replace(/^\d+\s*[-_.]?\s*/, "").trim().toLowerCase();
+
                       const necProds = rubricaProducts.filter((p) => {
                         const pCodeNec = formatNecessidadeWithCode(p.necessidade || "", p.rubrica);
-                        const formattedNec = formatNecessidadeWithCode(necName, rubricaName);
+                        const cleanP = (p.necessidade || "").replace(/^\d+\s*[-_.]?\s*/, "").trim().toLowerCase();
                         return (
                           (p.necessidade || "").trim().toLowerCase() === necName.trim().toLowerCase() ||
-                          pCodeNec.trim().toLowerCase() === formattedNec.trim().toLowerCase()
+                          pCodeNec.trim().toLowerCase() === formattedNec.trim().toLowerCase() ||
+                          cleanP === cleanNecName
                         );
                       });
 
+                      const isGroupActive =
+                        filterNecessidade !== "TODAS" &&
+                        (filterNecessidade.trim().toLowerCase() === formattedNec.trim().toLowerCase() ||
+                          filterNecessidade.replace(/^\d+\s*[-_.]?\s*/, "").trim().toLowerCase() === cleanNecName);
+
                       return (
-                        <div key={necName} className="bg-white p-5 rounded-2xl border border-gray-200 shadow-sm space-y-3">
-                          <div className="flex items-center justify-between">
-                            <span className="text-xs font-black text-gray-900">
-                              {formatNecessidadeWithCode(necName, rubricaName)}
-                            </span>
-                            <button
-                              type="button"
-                              onClick={() => {
-                                setNewProduct({
-                                  nome: "",
-                                  preco: 0,
-                                  unidade: "Unidade",
-                                  especificacao: "",
-                                  rubrica: rubricaName,
-                                  necessidade: necName,
-                                });
-                                setIsAddingNew(true);
-                              }}
-                              className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-[10px] font-black uppercase transition-all flex items-center gap-1 shadow-sm"
-                            >
-                              <Plus className="w-3.5 h-3.5" /> Adicionar Produto
-                            </button>
+                        <div
+                          key={necName}
+                          className={`p-5 rounded-2xl border transition-all space-y-3 ${
+                            isGroupActive
+                              ? "bg-white border-blue-500 shadow-md ring-1 ring-blue-400"
+                              : "bg-white border-gray-200 shadow-sm hover:border-gray-300"
+                          }`}
+                        >
+                          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-gray-100 pb-2.5">
+                            <div className="flex items-center gap-2">
+                              <span className="text-xs font-black text-gray-900">
+                                📂 {formattedNec}
+                              </span>
+                              <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-slate-100 text-slate-700 border border-slate-200">
+                                {necProds.length} {necProds.length === 1 ? "produto" : "produtos"}
+                              </span>
+                            </div>
+
+                            <div className="flex items-center gap-2">
+                              {!isGroupActive ? (
+                                <button
+                                  type="button"
+                                  onClick={() => setFilterNecessidade(formattedNec)}
+                                  className="px-2.5 py-1 bg-blue-50 hover:bg-blue-100 text-blue-800 rounded-xl text-[10px] font-bold transition-all border border-blue-200 flex items-center gap-1"
+                                >
+                                  <Search className="w-3 h-3" /> Ver Apenas Este Grupo
+                                </button>
+                              ) : (
+                                <button
+                                  type="button"
+                                  onClick={() => setFilterNecessidade("TODAS")}
+                                  className="px-2.5 py-1 bg-amber-50 hover:bg-amber-100 text-amber-900 rounded-xl text-[10px] font-bold transition-all border border-amber-200 flex items-center gap-1"
+                                >
+                                  <X className="w-3 h-3 text-amber-700" /> Mostrar Todos os Grupos
+                                </button>
+                              )}
+
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setNewProduct({
+                                    nome: "",
+                                    preco: 0,
+                                    unidade: "Unidade",
+                                    especificacao: "",
+                                    rubrica: rubricaName,
+                                    necessidade: necName,
+                                  });
+                                  setIsAddingNew(true);
+                                }}
+                                className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-[10px] font-black uppercase transition-all flex items-center gap-1 shadow-sm"
+                              >
+                                <Plus className="w-3.5 h-3.5" /> Adicionar Produto
+                              </button>
+                            </div>
                           </div>
 
                           {necProds.length === 0 ? (
-                            <p className="text-[11px] text-gray-400 italic">Sem produtos nesta necessidade ainda.</p>
+                            <p className="text-[11px] text-gray-400 italic py-2">Sem produtos nesta necessidade ainda.</p>
                           ) : (
                             <div className="overflow-x-auto">
                               <table className="w-full text-left text-xs">
@@ -620,6 +784,7 @@ export default function GestaoProdutosPrecosView() {
                                     <th className="py-2">Nome do Produto</th>
                                     <th className="py-2 text-right">Preço (MZN)</th>
                                     <th className="py-2">Unidade</th>
+                                    <th className="py-2">Especificação Técnica</th>
                                     <th className="py-2 text-right">Ações</th>
                                   </tr>
                                 </thead>
@@ -631,6 +796,9 @@ export default function GestaoProdutosPrecosView() {
                                         {Number(p.preco || 0).toLocaleString("pt-MZ", { minimumFractionDigits: 2 })} MZN
                                       </td>
                                       <td className="py-2 text-gray-600 font-bold">{p.unidade}</td>
+                                      <td className="py-2 text-gray-500 text-[11px] max-w-xs truncate" title={p.especificacao}>
+                                        {p.especificacao || "—"}
+                                      </td>
                                       <td className="py-2 text-right">
                                         <div className="flex items-center justify-end gap-1">
                                           <button

@@ -338,9 +338,35 @@ export default function MatrixView({
     const activity: MatrixActivity = {
       ...data,
       id: Math.random().toString(36).substr(2, 9),
-      unidadeOrganica: data.selectedCategory || "",
-      direcao: data.unidadeSelecionada || "",
-      departamento: data.departamento || "",
+      unidadeOrganica:
+        data.selectedCategory ||
+        data.unidadeOrganica ||
+        user?.unidadeOrganica ||
+        user?.unidade ||
+        "ISPS",
+      direcao:
+        data.unidadeSelecionada ||
+        data.direcao ||
+        user?.direcao ||
+        user?.servicoCentral ||
+        "Direção Geral",
+      departamento: data.departamento || user?.departamento || "Departamento Geral",
+      reparticao:
+        data.reparticao ||
+        data.setor ||
+        user?.reparticao ||
+        user?.setor ||
+        title ||
+        "Repartição Geral",
+      setor:
+        data.setor ||
+        data.reparticao ||
+        user?.setor ||
+        user?.sector ||
+        user?.seccao ||
+        user?.reparticao ||
+        title ||
+        "Setor Geral",
       orcamento: data.fonteReceita || "",
       nivel: data.prioridade || "Média",
       no: data.numeroActividade || data.nActividade || "1",
@@ -624,10 +650,42 @@ export default function MatrixView({
                         rubrica: mainRubric,
                         necessidade: mainNecessity,
                         unidadeOrganica:
-                          data.selectedCategory || data.unidadeOrganica || "",
-                        direcao: data.unidadeSelecionada || data.direcao || "",
-                        departamento: data.departamento || "",
-                        reparticao: data.reparticao || "",
+                          data.selectedCategory ||
+                          data.unidadeOrganica ||
+                          editingActivity.unidadeOrganica ||
+                          user?.unidadeOrganica ||
+                          user?.unidade ||
+                          "ISPS",
+                        direcao:
+                          data.unidadeSelecionada ||
+                          data.direcao ||
+                          editingActivity.direcao ||
+                          user?.direcao ||
+                          user?.servicoCentral ||
+                          "Direção Geral",
+                        departamento:
+                          data.departamento ||
+                          editingActivity.departamento ||
+                          user?.departamento ||
+                          "Departamento Geral",
+                        reparticao:
+                          data.reparticao ||
+                          data.setor ||
+                          editingActivity.reparticao ||
+                          user?.reparticao ||
+                          user?.setor ||
+                          title ||
+                          "Repartição Geral",
+                        setor:
+                          data.setor ||
+                          data.reparticao ||
+                          editingActivity.setor ||
+                          user?.setor ||
+                          user?.sector ||
+                          user?.seccao ||
+                          user?.reparticao ||
+                          title ||
+                          "Setor Geral",
                         no:
                           data.numeroAtividade ||
                           data.nActividade ||

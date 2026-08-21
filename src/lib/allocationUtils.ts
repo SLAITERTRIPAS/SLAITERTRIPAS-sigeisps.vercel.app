@@ -4,8 +4,78 @@ import {
   DEPARTAMENTOS,
   REPARTICOES,
   SECTORES,
+  CATEGORIAS_DOCENTES,
 } from "../constants/formOptions";
 import { classifyTipo, hasChefiaPosition } from "./utils";
+
+export function isDocenteColaborador(c: any): boolean {
+  if (!c) return false;
+  const tipo = (c.tipo || "").toString().toLowerCase().trim();
+  const categoria = (c.categoria || "").toString().trim();
+  const categoriaLower = categoria.toLowerCase();
+  const carreira = (c.carreira || "").toString().toLowerCase().trim();
+  const cargo = (c.cargo || "").toString().toLowerCase().trim();
+  const funcao = (c.funcao || "").toString().toLowerCase().trim();
+
+  if (
+    tipo === "docente" ||
+    tipo.includes("docente") ||
+    tipo.includes("profess") ||
+    carreira.includes("docente")
+  ) {
+    return true;
+  }
+
+  if (CATEGORIAS_DOCENTES.some((cat) => cat.toLowerCase() === categoriaLower)) {
+    return true;
+  }
+
+  if (
+    categoriaLower.includes("professor") ||
+    categoriaLower.includes("docente") ||
+    categoriaLower.includes("assistente universit") ||
+    cargo.includes("docente") ||
+    cargo.includes("professor") ||
+    funcao.includes("docente") ||
+    funcao.includes("professor")
+  ) {
+    return true;
+  }
+
+  return false;
+}
+
+export function loadAllDocentes(dbColabs: any[] = []): any[] {
+  const map = new Map<string, any>();
+
+  if (Array.isArray(EFETIVO_GERAL_DATA)) {
+    EFETIVO_GERAL_DATA.forEach((colab) => {
+      if (isDocenteColaborador(colab)) {
+        const key = (colab.id || colab.nuit || colab.nome || "")
+          .toString()
+          .toLowerCase()
+          .trim();
+        if (key) map.set(key, colab);
+      }
+    });
+  }
+
+  if (Array.isArray(dbColabs)) {
+    dbColabs.forEach((colab) => {
+      if (isDocenteColaborador(colab)) {
+        const key = (colab.id || colab.nuit || colab.nome || "")
+          .toString()
+          .toLowerCase()
+          .trim();
+        if (key) map.set(key, colab);
+      }
+    });
+  }
+
+  return Array.from(map.values()).sort((a, b) =>
+    (a.nome || "").localeCompare(b.nome || "")
+  );
+}
 
 export interface UserAllocatedDetails {
   cat: string;

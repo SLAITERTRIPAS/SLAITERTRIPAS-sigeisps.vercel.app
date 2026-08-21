@@ -357,6 +357,87 @@ export function getOfficialRubricaLabel(rubricaRaw?: string, necessidadeRaw?: st
   return "121098 - Outros bens de consumo";
 }
 
+export function getCanonicalItemName(
+  necStr?: string,
+  prodStr?: string
+): { canonicalKey: string; displayName: string; productName: string } {
+  const cleanProd = (prodStr || "").trim();
+  const cleanNec = (necStr || "").trim();
+
+  // Item principal de referência
+  const primary = cleanProd || cleanNec || "Necessidade Geral";
+
+  // Normalização do texto (remove acentos e converte para minúsculas)
+  let normalized = primary
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .trim();
+
+  // Remove prefixos de ação para agrupar produtos idênticos (ex: "Aquisição de ", "Compra de ")
+  normalized = normalized
+    .replace(/^(aquisicao|compra|fornecimento|contratacao|pagamento|aluguer|prestacao|servico|servicos)\s+de\s+/gi, "")
+    .replace(/^(aquisicao|compra|fornecimento|contratacao|pagamento|aluguer|prestacao)\s+/gi, "")
+    .replace(/\s+/g, " ")
+    .trim();
+
+  const canonicalKey = normalized || primary.toLowerCase().trim();
+  const displayName = cleanNec || primary;
+  const productName = cleanProd || primary;
+
+  return { canonicalKey, displayName, productName };
+}
+
+export function getCanonicalGroupAndProduct(
+  necStr?: string,
+  prodStr?: string
+): {
+  groupKey: string;
+  groupName: string;
+  productKey: string;
+  productName: string;
+} {
+  const cleanNec = (necStr || "").trim();
+  const cleanProd = (prodStr || "").trim();
+
+  // Grupo principal da necessidade
+  const rawGroupName = cleanNec || cleanProd || "Necessidades Gerais";
+
+  let normGroup = rawGroupName
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .trim();
+
+  normGroup = normGroup
+    .replace(/^(aquisicao|compra|fornecimento|contratacao|pagamento|aluguer|prestacao|servico|servicos)\s+de\s+/gi, "")
+    .replace(/^(aquisicao|compra|fornecimento|contratacao|pagamento|aluguer|prestacao)\s+/gi, "")
+    .replace(/\s+/g, " ")
+    .trim();
+
+  const groupKey = normGroup || "geral";
+  const groupName = cleanNec || rawGroupName;
+
+  // Produto específico dentro da necessidade
+  const rawProdName = cleanProd || cleanNec || "Item / Serviço Planificado";
+  let normProd = rawProdName
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .trim();
+
+  normProd = normProd
+    .replace(/^(aquisicao|compra|fornecimento|contratacao|pagamento|aluguer|prestacao|servico|servicos)\s+de\s+/gi, "")
+    .replace(/^(aquisicao|compra|fornecimento|contratacao|pagamento|aluguer|prestacao)\s+/gi, "")
+    .replace(/\s+/g, " ")
+    .trim();
+
+  const productKey = normProd || "item";
+  const productName = cleanProd || rawProdName;
+
+  return { groupKey, groupName, productKey, productName };
+}
+
 const normalizeStr = (str?: string): string => {
   if (!str) return "";
   return str
@@ -612,7 +693,7 @@ export default function AcaoOrcamentalView({
 
       return matchesUnitStr(act.departamento, selectedUnit);
     });
-  }, [activities, selectedLevel, selectedUnit, isPlanificacaoOrDPEP, user, userDirecao, userDepartamento]);
+  }, [authorizedActivities, selectedLevel, selectedUnit, isPlanificacaoOrDPEP, user, userDirecao, userDepartamento]);
 
   // Total Geral do valor de todas as atividades planificadas (Orçamento do Nível/Departamento)
   const totalOrcamentadoSetor = useMemo(() => {
@@ -671,7 +752,7 @@ export default function AcaoOrcamentalView({
       }
       return sum + actVal;
     }, 0);
-  }, [activities]);
+  }, [authorizedActivities]);
 
   const rubricasBreakdown = useMemo(() => {
     const rubricaMap: {
@@ -718,10 +799,9 @@ export default function AcaoOrcamentalView({
           const rubricaStr = getOfficialRubricaLabel(rawRub, necessidadeStr);
           const prodName = String(r.nomeProduto || r.especificacao || r.produto || r.item || "").trim();
           
-          // Normalização para evitar repetições por caixa alta/baixa
+          // Normalização e Agrupamento Único de Rúbricas e Produtos/Necessidades
           const rubricaKey = rubricaStr.toUpperCase();
-          const necessityKey = necessidadeStr.toUpperCase();
-          const productKey = prodName.toUpperCase();
+          const { canonicalKey, displayName, productName } = getCanonicalItemName(necessidadeStr, prodName);
           
           const qty = Number(r.quantidade || r.qtd || 1);
           const val = Number(
@@ -740,11 +820,10 @@ export default function AcaoOrcamentalView({
             }
             rubricaMap[rubricaKey].totalValorRubrica += val;
 
-            const necKey = `${necessityKey}${productKey ? `_#_${productKey}` : ""}`;
-            if (!rubricaMap[rubricaKey].necessidadesMap[necKey]) {
-              rubricaMap[rubricaKey].necessidadesMap[necKey] = {
-                necessidadeName: necessidadeStr,
-                nomeProduto: prodName,
+            if (!rubricaMap[rubricaKey].necessidadesMap[canonicalKey]) {
+              rubricaMap[rubricaKey].necessidadesMap[canonicalKey] = {
+                necessidadeName: displayName,
+                nomeProduto: productName,
                 quantidadeTotal: 0,
                 valorTotalNecessidade: 0,
                 atividadesCount: 0,
@@ -752,9 +831,9 @@ export default function AcaoOrcamentalView({
                 especificacao: r.especificacao || "",
               };
             }
-            rubricaMap[rubricaKey].necessidadesMap[necKey].quantidadeTotal += qty;
-            rubricaMap[rubricaKey].necessidadesMap[necKey].valorTotalNecessidade += val;
-            rubricaMap[rubricaKey].necessidadesMap[necKey].atividadesCount += 1;
+            rubricaMap[rubricaKey].necessidadesMap[canonicalKey].quantidadeTotal += qty;
+            rubricaMap[rubricaKey].necessidadesMap[canonicalKey].valorTotalNecessidade += val;
+            rubricaMap[rubricaKey].necessidadesMap[canonicalKey].atividadesCount += 1;
           }
         });
       }
@@ -784,7 +863,7 @@ export default function AcaoOrcamentalView({
           const rubricaStr = getOfficialRubricaLabel(rawRub, necessidadeStr);
           const qty = Number(act.quantidade || act.qtd || 1);
           const rubricaKey = rubricaStr.toUpperCase();
-          const necessityKey = necessidadeStr.toUpperCase();
+          const { canonicalKey, displayName, productName } = getCanonicalItemName(necessidadeStr, "");
 
           if (!rubricaMap[rubricaKey]) {
             rubricaMap[rubricaKey] = {
@@ -795,17 +874,18 @@ export default function AcaoOrcamentalView({
           }
           rubricaMap[rubricaKey].totalValorRubrica += val;
 
-          if (!rubricaMap[rubricaKey].necessidadesMap[necessityKey]) {
-            rubricaMap[rubricaKey].necessidadesMap[necessityKey] = {
-              necessidadeName: necessidadeStr,
+          if (!rubricaMap[rubricaKey].necessidadesMap[canonicalKey]) {
+            rubricaMap[rubricaKey].necessidadesMap[canonicalKey] = {
+              necessidadeName: displayName,
+              nomeProduto: productName,
               quantidadeTotal: 0,
               valorTotalNecessidade: 0,
               atividadesCount: 0,
             };
           }
-          rubricaMap[rubricaKey].necessidadesMap[necessityKey].quantidadeTotal += qty;
-          rubricaMap[rubricaKey].necessidadesMap[necessityKey].valorTotalNecessidade += val;
-          rubricaMap[rubricaKey].necessidadesMap[necessityKey].atividadesCount += 1;
+          rubricaMap[rubricaKey].necessidadesMap[canonicalKey].quantidadeTotal += qty;
+          rubricaMap[rubricaKey].necessidadesMap[canonicalKey].valorTotalNecessidade += val;
+          rubricaMap[rubricaKey].necessidadesMap[canonicalKey].atividadesCount += 1;
         }
       }
     });
@@ -871,7 +951,7 @@ export default function AcaoOrcamentalView({
     sectorActivities.forEach((act) => {
       if (Array.isArray(act.rubricas) && act.rubricas.length > 0) {
         act.rubricas.forEach((r: any) => {
-          const rubricaStr = (r.rubrica || r.code || "Diversos / Geral").trim();
+          const rawRub = (r.rubrica || r.code || "Diversos / Geral").trim();
           const necessidadeStr = (
             r.necessidade ||
             r.descricao ||
@@ -880,13 +960,17 @@ export default function AcaoOrcamentalView({
             act.title ||
             "Sem Descrição"
           ).trim();
+          const prodName = String(r.nomeProduto || r.especificacao || r.produto || r.item || "").trim();
           const valorNum = Number(r.valorTotal || r.total || r.valor || 0);
 
-          const key = `${rubricaStr}-${necessidadeStr}`;
+          const officialRub = getOfficialRubricaLabel(rawRub, necessidadeStr);
+          const { canonicalKey, displayName, productName } = getCanonicalItemName(necessidadeStr, prodName);
+
+          const key = `${officialRub.toUpperCase()}_#_${canonicalKey}`;
           if (!map[key]) {
             map[key] = {
-              rubrica: rubricaStr,
-              necessidade: necessidadeStr,
+              rubrica: officialRub,
+              necessidade: productName ? `${displayName} [${productName}]` : displayName,
               valor: 0,
             };
           }
@@ -894,7 +978,7 @@ export default function AcaoOrcamentalView({
         });
       } else {
         // Fallback caso não possua a estrutura de rubricas
-        const rubricaStr = (act.rubrica || "Diversos / Geral").trim();
+        const rawRub = (act.rubrica || "Diversos / Geral").trim();
         const necessidadeStr = (
           act.designacao ||
           act.necessidade ||
@@ -903,11 +987,14 @@ export default function AcaoOrcamentalView({
         ).trim();
         const valorNum = Number(act.valor || act.orcamentoTotal || 0);
 
-        const key = `${rubricaStr}-${necessidadeStr}`;
+        const officialRub = getOfficialRubricaLabel(rawRub, necessidadeStr);
+        const { canonicalKey, displayName } = getCanonicalItemName(necessidadeStr, "");
+
+        const key = `${officialRub.toUpperCase()}_#_${canonicalKey}`;
         if (!map[key]) {
           map[key] = {
-            rubrica: rubricaStr,
-            necessidade: necessidadeStr,
+            rubrica: officialRub,
+            necessidade: displayName,
             valor: 0,
           };
         }
@@ -1219,18 +1306,51 @@ export default function AcaoOrcamentalView({
         label: string;
         totalQuant: number;
         totalValor: number;
-        itemsMap: Record<
+        necessidadesMap: Record<
           string,
           {
-            label: string;
-            nomeProduto?: string;
+            groupKey: string;
+            groupName: string;
+            totalQuant: number;
+            totalValor: number;
+            productsMap: Record<
+              string,
+              {
+                productKey: string;
+                productName: string;
+                quant: number;
+                valor: number;
+                precoUnitario?: number;
+                especificacao?: string;
+                count: number;
+              }
+            >;
+            productsList: Array<{
+              productKey: string;
+              productName: string;
+              quant: number;
+              valor: number;
+              precoUnitario?: number;
+              especificacao?: string;
+              count: number;
+            }>;
+          }
+        >;
+        necessidadesList: Array<{
+          groupKey: string;
+          groupName: string;
+          totalQuant: number;
+          totalValor: number;
+          productsList: Array<{
+            productKey: string;
+            productName: string;
             quant: number;
             valor: number;
             precoUnitario?: number;
             especificacao?: string;
             count: number;
-          }
-        >;
+          }>;
+        }>;
       }
     > = {};
 
@@ -1243,7 +1363,8 @@ export default function AcaoOrcamentalView({
           label: fullLabel,
           totalQuant: 0,
           totalValor: 0,
-          itemsMap: {},
+          necessidadesMap: {},
+          necessidadesList: [],
         };
       });
 
@@ -1252,7 +1373,8 @@ export default function AcaoOrcamentalView({
         label: "(em branco)",
         totalQuant: 0,
         totalValor: 0,
-        itemsMap: {},
+        necessidadesMap: {},
+        necessidadesList: [],
       };
     }
 
@@ -1274,8 +1396,7 @@ export default function AcaoOrcamentalView({
             hasRubrica = true;
             const targetLabel = getOfficialRubricaLabel(rubStr, necStr);
             const rubKey = targetLabel.toUpperCase();
-            const necKeyNormalized = necStr.toUpperCase();
-            const prodKeyNormalized = prodName.toUpperCase();
+            const { groupKey, groupName, productKey, productName } = getCanonicalGroupAndProduct(necStr, prodName);
 
             if (!map[rubKey]) {
               map[rubKey] = {
@@ -1283,18 +1404,33 @@ export default function AcaoOrcamentalView({
                 label: targetLabel,
                 totalQuant: 0,
                 totalValor: 0,
-                itemsMap: {},
+                necessidadesMap: {},
+                necessidadesList: [],
               };
             }
 
             map[rubKey].totalQuant += qty;
             map[rubKey].totalValor += val;
 
-            const itemKey = `${necKeyNormalized}_#_${prodKeyNormalized}`;
-            if (!map[rubKey].itemsMap[itemKey]) {
-              map[rubKey].itemsMap[itemKey] = {
-                label: necStr,
-                nomeProduto: prodName,
+            if (!map[rubKey].necessidadesMap[groupKey]) {
+              map[rubKey].necessidadesMap[groupKey] = {
+                groupKey,
+                groupName,
+                totalQuant: 0,
+                totalValor: 0,
+                productsMap: {},
+                productsList: [],
+              };
+            }
+
+            const group = map[rubKey].necessidadesMap[groupKey];
+            group.totalQuant += qty;
+            group.totalValor += val;
+
+            if (!group.productsMap[productKey]) {
+              group.productsMap[productKey] = {
+                productKey,
+                productName,
                 quant: 0,
                 valor: 0,
                 precoUnitario: pUnit,
@@ -1302,9 +1438,10 @@ export default function AcaoOrcamentalView({
                 count: 0,
               };
             }
-            map[rubKey].itemsMap[itemKey].quant += qty;
-            map[rubKey].itemsMap[itemKey].valor += val;
-            map[rubKey].itemsMap[itemKey].count += 1;
+            group.productsMap[productKey].quant += qty;
+            group.productsMap[productKey].valor += val;
+            group.productsMap[productKey].count += 1;
+            if (pUnit > 0) group.productsMap[productKey].precoUnitario = pUnit;
           }
         });
       }
@@ -1320,7 +1457,7 @@ export default function AcaoOrcamentalView({
         if (val >= 0 || qty >= 0) {
           const targetLabel = getOfficialRubricaLabel(rubStr, necStr);
           const rubKey = targetLabel.toUpperCase();
-          const necKeyNormalized = (necStr || "Atividade Planificada").toUpperCase();
+          const { groupKey, groupName, productKey, productName } = getCanonicalGroupAndProduct(necStr, "");
 
           if (!map[rubKey]) {
             map[rubKey] = {
@@ -1328,32 +1465,62 @@ export default function AcaoOrcamentalView({
               label: targetLabel,
               totalQuant: 0,
               totalValor: 0,
-              itemsMap: {},
+              necessidadesMap: {},
+              necessidadesList: [],
             };
           }
 
           map[rubKey].totalQuant += qty;
           map[rubKey].totalValor += val;
 
-          if (!map[rubKey].itemsMap[necKeyNormalized]) {
-            map[rubKey].itemsMap[necKeyNormalized] = {
-              label: necStr || "Atividade Planificada",
+          if (!map[rubKey].necessidadesMap[groupKey]) {
+            map[rubKey].necessidadesMap[groupKey] = {
+              groupKey,
+              groupName: groupName || "Atividade Planificada",
+              totalQuant: 0,
+              totalValor: 0,
+              productsMap: {},
+              productsList: [],
+            };
+          }
+
+          const group = map[rubKey].necessidadesMap[groupKey];
+          group.totalQuant += qty;
+          group.totalValor += val;
+
+          if (!group.productsMap[productKey]) {
+            group.productsMap[productKey] = {
+              productKey,
+              productName: productName || "Atividade Planificada",
               quant: 0,
               valor: 0,
               count: 0,
             };
           }
-          map[rubKey].itemsMap[necKeyNormalized].quant += qty;
-          map[rubKey].itemsMap[necKeyNormalized].valor += val;
-          map[rubKey].itemsMap[necKeyNormalized].count += 1;
+          group.productsMap[productKey].quant += qty;
+          group.productsMap[productKey].valor += val;
+          group.productsMap[productKey].count += 1;
         }
       }
     });
 
     return Object.values(map)
       .filter((row) => !showOnlyNonZeroPivot || row.totalValor > 0 || row.totalQuant > 0)
+      .map((row) => {
+        const necessidadesList = Object.values(row.necessidadesMap)
+          .map((group) => ({
+            ...group,
+            productsList: Object.values(group.productsMap).sort((a, b) => b.valor - a.valor),
+          }))
+          .sort((a, b) => b.totalValor - a.totalValor);
+
+        return {
+          ...row,
+          necessidadesList,
+        };
+      })
       .sort((a, b) => a.code.localeCompare(b.code));
-  }, [sectorActivities]);
+  }, [sectorActivities, showOnlyNonZeroPivot]);
 
   const sistafeGrandTotals = useMemo(() => {
     return sistafePivotData.reduce(
@@ -1396,7 +1563,7 @@ export default function AcaoOrcamentalView({
       .map(([name, total]) => ({ name, total }))
       .filter(item => item.total > 0)
       .sort((a, b) => b.total - a.total);
-  }, [activities]);
+  }, [authorizedActivities]);
 
   // Mapeamento de Direções por Departamento
   const direcaoByDepartamento = useMemo(() => {
@@ -1775,17 +1942,47 @@ export default function AcaoOrcamentalView({
           {/* Hierarquia Orçamental (Novo Requisito) */}
           {(isPlanificacaoOrDPEP || isSuperBossUser(user)) && selectedLevel === "institucional" && (
             <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm space-y-4">
-              <div className="flex items-center gap-2 mb-2">
-                <div className="p-2 bg-indigo-100 text-indigo-600 rounded-lg">
-                  <PieChart size={20} />
-                </div>
-                <div>
-                  <h3 className="text-sm font-black text-slate-900 uppercase tracking-wider">Monitoria Hierárquica Orçamental</h3>
-                  <p className="text-[10px] text-slate-500 font-medium">Visualização por níveis e unidades organizacionais</p>
+              <div className="flex items-center justify-between flex-wrap gap-4">
+                <div className="flex items-center gap-2">
+                  <div className="p-2 bg-indigo-100 text-indigo-600 rounded-lg">
+                    <PieChart size={20} />
+                  </div>
+                  <div>
+                    <h3 className="text-sm font-black text-slate-900 uppercase tracking-wider">Monitoria & Organização Hierárquica dos Orçamentos</h3>
+                    <p className="text-[10px] text-slate-500 font-medium">Consolidação piramidal de orçamentos por jurisdição (Setor ➔ Repartição ➔ Departamento ➔ Direção ➔ Institucional)</p>
+                  </div>
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+              {/* Informação sobre a Regra de Agregação Orçamental */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 bg-slate-50/80 p-4 rounded-2xl border border-slate-200/60">
+                <div className="bg-white p-3 rounded-xl border border-slate-100 shadow-2xs">
+                  <div className="text-[10px] font-black text-amber-600 uppercase tracking-wider mb-1">1. Orçamento de Repartição</div>
+                  <p className="text-[11px] text-slate-600 font-medium leading-relaxed">
+                    Soma do total de valores das atividades planificadas em cada setor que responde à repartição.
+                  </p>
+                </div>
+                <div className="bg-white p-3 rounded-xl border border-slate-100 shadow-2xs">
+                  <div className="text-[10px] font-black text-blue-600 uppercase tracking-wider mb-1">2. Orçamento de Departamento</div>
+                  <p className="text-[11px] text-slate-600 font-medium leading-relaxed">
+                    Soma do total de valores das atividades em cada repartição que responde ao departamento.
+                  </p>
+                </div>
+                <div className="bg-white p-3 rounded-xl border border-slate-100 shadow-2xs">
+                  <div className="text-[10px] font-black text-emerald-600 uppercase tracking-wider mb-1">3. Orçamento de Direção</div>
+                  <p className="text-[11px] text-slate-600 font-medium leading-relaxed">
+                    Soma do total de valores das atividades em cada departamento que responde à direção.
+                  </p>
+                </div>
+                <div className="bg-white p-3 rounded-xl border border-slate-100 shadow-2xs">
+                  <div className="text-[10px] font-black text-purple-600 uppercase tracking-wider mb-1">4. Orçamento Institucional</div>
+                  <p className="text-[11px] text-slate-600 font-medium leading-relaxed">
+                    Soma do total de valores das atividades planificadas de todas as direções da instituição.
+                  </p>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 pt-2">
                 <div className="space-y-1.5">
                   <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">Nível de Visualização</label>
                   <select 
@@ -2028,7 +2225,7 @@ export default function AcaoOrcamentalView({
 
                     return filteredRows.map((row, idx) => {
                       const isExpanded = !!expandedPivotRows[row.label];
-                      const hasItems = Object.keys(row.itemsMap).length > 0;
+                      const hasGroups = row.necessidadesList.length > 0;
 
                       return (
                         <React.Fragment key={idx}>
@@ -2049,10 +2246,10 @@ export default function AcaoOrcamentalView({
                                 <span>{row.label}</span>
                               </div>
                             </td>
-                            <td className="p-3 border border-slate-200 text-slate-600">
-                              —
+                            <td className="p-3 border border-slate-200 text-slate-500 font-medium text-xs">
+                              {row.necessidadesList.length > 0 ? `${row.necessidadesList.length} grupo(s) de necessidade` : "—"}
                             </td>
-                            <td className="p-3 border border-slate-200 text-slate-600">
+                            <td className="p-3 border border-slate-200 text-slate-500 font-medium text-xs">
                               —
                             </td>
                             <td className="p-3 text-center border border-slate-200 font-mono font-bold text-blue-900">
@@ -2068,33 +2265,65 @@ export default function AcaoOrcamentalView({
                             </td>
                           </tr>
 
-                          {/* Sub-itens Expandidos (Necessidades & Produtos) */}
-                          {isExpanded && hasItems &&
-                            Object.values(row.itemsMap).map((item: any, iIdx) => (
-                              <tr key={iIdx} className="border-b border-slate-100 bg-slate-50/70 text-slate-700">
-                                <td className="p-3 border border-slate-200 font-mono text-[10px] text-slate-400">
-                                  {String(idx + 1).padStart(2, "0")}.{iIdx + 1}
-                                </td>
-                                <td className="p-3 border border-slate-200 font-medium text-slate-600">
-                                  ↳ {row.label}
-                                </td>
-                                <td className="p-3 border border-slate-200 font-semibold text-slate-800">
-                                  {item.label}
-                                </td>
-                                <td className="p-3 border border-slate-200 font-medium text-slate-700">
-                                  {item.nomeProduto || "—"}
-                                  {item.especificacao && <div className="text-[10px] text-slate-500 italic">{item.especificacao}</div>}
-                                </td>
-                                <td className="p-3 text-center border border-slate-200 font-mono font-bold text-blue-900 bg-blue-50/40">
-                                  {item.quant > 0 ? item.quant.toLocaleString("pt-MZ") : "—"}
-                                </td>
-                                <td className="p-3 text-right border border-slate-200 font-mono font-semibold text-slate-800">
-                                  {item.valor.toLocaleString("pt-MZ", {
-                                    minimumFractionDigits: 2,
-                                    maximumFractionDigits: 2,
-                                  }) + " MZN"}
-                                </td>
-                              </tr>
+                          {/* Grupos de Necessidades & Produtos Expandidos */}
+                          {isExpanded && hasGroups &&
+                            row.necessidadesList.map((group, gIdx) => (
+                              <React.Fragment key={`group-${idx}-${gIdx}`}>
+                                {/* Subcabeçalho de Grupo de Necessidade */}
+                                <tr className="bg-sky-100/80 text-sky-950 font-bold border-b border-sky-200">
+                                  <td className="p-2.5 border border-slate-300 font-mono text-[11px] text-sky-800">
+                                    {String(idx + 1).padStart(2, "0")}.{gIdx + 1}
+                                  </td>
+                                  <td className="p-2.5 border border-slate-300 font-bold" colSpan={2}>
+                                    <div className="flex items-center gap-2">
+                                      <span className="px-2 py-0.5 bg-sky-200/90 text-sky-900 rounded text-[10px] font-black uppercase tracking-wider">
+                                        Grupo
+                                      </span>
+                                      <span className="text-xs font-black">{group.groupName}</span>
+                                    </div>
+                                  </td>
+                                  <td className="p-2.5 border border-slate-300 text-sky-800 text-[11px] italic font-normal">
+                                    {group.productsList.length} {group.productsList.length === 1 ? "item/produto" : "itens/produtos"}
+                                  </td>
+                                  <td className="p-2.5 text-center border border-slate-300 font-mono font-bold text-sky-900 bg-sky-200/40">
+                                    {group.totalQuant > 0 ? group.totalQuant.toLocaleString("pt-MZ") : "—"}
+                                  </td>
+                                  <td className="p-2.5 text-right border border-slate-300 font-mono font-black text-sky-950 bg-sky-200/50">
+                                    {group.totalValor.toLocaleString("pt-MZ", {
+                                      minimumFractionDigits: 2,
+                                      maximumFractionDigits: 2,
+                                    }) + " MZN"}
+                                  </td>
+                                </tr>
+
+                                {/* Produtos/Itens do Grupo */}
+                                {group.productsList.map((prod, pIdx) => (
+                                  <tr key={`prod-${idx}-${gIdx}-${pIdx}`} className="border-b border-slate-100 bg-white hover:bg-slate-50 text-slate-700">
+                                    <td className="p-2 pl-4 border border-slate-200 font-mono text-[10px] text-slate-400">
+                                      {String(idx + 1).padStart(2, "0")}.{gIdx + 1}.{pIdx + 1}
+                                    </td>
+                                    <td className="p-2 pl-6 border border-slate-200 font-normal text-slate-500 text-xs">
+                                      ↳ {row.label}
+                                    </td>
+                                    <td className="p-2 pl-6 border border-slate-200 font-medium text-slate-700 text-xs">
+                                      📁 {group.groupName}
+                                    </td>
+                                    <td className="p-2 border border-slate-200 font-semibold text-slate-900 text-xs">
+                                      {prod.productName}
+                                      {prod.especificacao && <div className="text-[10px] text-slate-500 italic font-normal">{prod.especificacao}</div>}
+                                    </td>
+                                    <td className="p-2 text-center border border-slate-200 font-mono font-bold text-blue-900 bg-blue-50/20">
+                                      {prod.quant > 0 ? prod.quant.toLocaleString("pt-MZ") : "—"}
+                                    </td>
+                                    <td className="p-2 text-right border border-slate-200 font-mono font-medium text-slate-800">
+                                      {prod.valor.toLocaleString("pt-MZ", {
+                                        minimumFractionDigits: 2,
+                                        maximumFractionDigits: 2,
+                                      }) + " MZN"}
+                                    </td>
+                                  </tr>
+                                ))}
+                              </React.Fragment>
                             ))}
                         </React.Fragment>
                       );
@@ -2152,7 +2381,7 @@ export default function AcaoOrcamentalView({
                 <tbody className="divide-y divide-slate-300 bg-white">
                   {sistafePivotData.map((row, idx) => (
                     <React.Fragment key={idx}>
-                      <tr className={`border-b border-slate-300 ${row.totalValor > 0 ? "font-bold text-slate-900 bg-slate-50/50" : "text-slate-500"}`}>
+                      <tr className={`border-b border-slate-300 ${row.totalValor > 0 ? "font-bold text-slate-900 bg-slate-100" : "text-slate-500"}`}>
                         <td className="p-2 border border-slate-300 font-bold">{row.label}</td>
                         <td className="p-2 text-right border border-slate-300 font-mono font-bold">
                           {row.totalValor > 0
@@ -2163,21 +2392,35 @@ export default function AcaoOrcamentalView({
                             : "0,00"}
                         </td>
                       </tr>
-                      {Object.values(row.itemsMap).map((item: any, iIdx) => (
-                        <tr key={iIdx} className="border-b border-slate-200 text-slate-700 bg-white">
-                          <td className="p-1.5 pl-8 border border-slate-300 font-normal text-slate-700 text-[11px]" style={{ letterSpacing: '0.3px' }}>
-                            └─ {item.label}
-                            {item.nomeProduto && ` [Produto: ${item.nomeProduto}]`}
-                            {item.quant > 0 && ` (${item.quant} un/L${item.precoUnitario ? ` × ${item.precoUnitario} MT` : ""})`}
-                            {item.especificacao && ` - ${item.especificacao}`}
-                          </td>
-                          <td className="p-1.5 text-right border border-slate-300 font-mono text-slate-800 text-[11px]" style={{ letterSpacing: '0.3px' }}>
-                            {item.valor.toLocaleString("pt-MZ", {
-                              minimumFractionDigits: 2,
-                              maximumFractionDigits: 2,
-                            })}
-                          </td>
-                        </tr>
+                      {row.necessidadesList.map((group, gIdx) => (
+                        <React.Fragment key={gIdx}>
+                          <tr className="bg-slate-50 font-bold text-slate-800 border-b border-slate-300">
+                            <td className="p-1.5 pl-6 border border-slate-300 font-bold text-xs text-sky-900">
+                              📁 GRUPO DE NECESSIDADE: {group.groupName}
+                            </td>
+                            <td className="p-1.5 text-right border border-slate-300 font-mono font-bold text-xs text-sky-900">
+                              {group.totalValor.toLocaleString("pt-MZ", {
+                                minimumFractionDigits: 2,
+                                maximumFractionDigits: 2,
+                              })}
+                            </td>
+                          </tr>
+                          {group.productsList.map((prod, pIdx) => (
+                            <tr key={pIdx} className="border-b border-slate-200 text-slate-700 bg-white">
+                              <td className="p-1 pl-12 border border-slate-300 font-normal text-slate-700 text-[11px]" style={{ letterSpacing: '0.3px' }}>
+                                └─ {prod.productName}
+                                {prod.quant > 0 && ` (${prod.quant} un/L${prod.precoUnitario ? ` × ${prod.precoUnitario} MT` : ""})`}
+                                {prod.especificacao && ` - ${prod.especificacao}`}
+                              </td>
+                              <td className="p-1 text-right border border-slate-300 font-mono text-slate-800 text-[11px]" style={{ letterSpacing: '0.3px' }}>
+                                {prod.valor.toLocaleString("pt-MZ", {
+                                  minimumFractionDigits: 2,
+                                  maximumFractionDigits: 2,
+                                })}
+                              </td>
+                            </tr>
+                          ))}
+                        </React.Fragment>
                       ))}
                     </React.Fragment>
                   ))}
