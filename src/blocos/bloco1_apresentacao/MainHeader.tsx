@@ -86,8 +86,7 @@ export default function MainHeader({
   }, []);
 
   const rawDayOfWeek = now.toLocaleDateString("pt-PT", { weekday: "long" });
-  const dayOfWeek =
-    rawDayOfWeek.charAt(0).toUpperCase() + rawDayOfWeek.slice(1);
+  const dayOfWeek = rawDayOfWeek.toUpperCase();
   const dateStr = now.toLocaleDateString("pt-PT", {
     day: "2-digit",
     month: "long",
@@ -234,28 +233,33 @@ export default function MainHeader({
 
           {/* Center - Date & Time (Floating Box) */}
           <div 
-            className="hidden lg:flex flex-col items-center justify-center border-2 border-white/20 px-4 py-1 bg-[#0a0f2b] min-w-[220px] mx-auto overflow-hidden shadow-[0_8px_32px_rgba(0,0,0,0.5)] border-t-white/40 border-l-white/40"
+            className="hidden sm:flex flex-col items-center justify-center border-2 border-[#546282]/80 px-6 py-1.5 bg-[#070e2d] min-w-[210px] md:min-w-[240px] mx-auto rounded-2xl shadow-[0_4px_20px_rgba(0,0,0,0.7)]"
             style={{ 
-              fontFamily: '"Bookman Old Style", serif',
-              borderRadius: '0.5px' 
+              fontFamily: '"Bookman Old Style", Georgia, serif'
             }}
           >
-            <div className="flex flex-col items-center justify-center gap-0.5 w-full leading-tight">
+            <div className="flex flex-col items-center justify-center gap-0.5 w-full leading-tight text-center">
               <span
-                className="text-[#FFB800] text-sm font-black tracking-widest uppercase"
-                style={textShadowStyle}
+                className="text-[#FFB800] text-xs md:text-sm font-black tracking-widest uppercase"
+                style={{
+                  textShadow: "1.5px 1.5px 0px #000, 2px 2px 0px #000, 3px 3px 6px rgba(0,0,0,0.8)",
+                }}
               >
                 {dayOfWeek}
               </span>
               <span
-                className="text-white text-lg font-black tracking-[0.1em] tabular-nums"
-                style={textShadowStyle}
+                className="text-white text-xl md:text-2xl font-black tracking-widest tabular-nums my-0.5"
+                style={{
+                  textShadow: "1.5px 1.5px 0px #000, 2.5px 2.5px 0px #000, 3px 3px 6px rgba(0,0,0,0.8)",
+                }}
               >
                 {timeStr}
               </span>
               <span
-                className="text-white text-[10px] font-black tracking-widest"
-                style={textShadowStyle}
+                className="text-white text-[11px] md:text-xs font-bold tracking-wide"
+                style={{
+                  textShadow: "1px 1px 0px #000, 2px 2px 4px rgba(0,0,0,0.8)",
+                }}
               >
                 {dateStr}
               </span>
@@ -385,11 +389,11 @@ export default function MainHeader({
                     e.stopPropagation();
                     onBack();
                   }}
-                  className="bg-transparent hover:bg-amber-500/10 border-2 border-amber-500/70 text-amber-500 active:scale-95 px-3 py-1 rounded-full flex items-center gap-2 font-black shadow-lg transition-all cursor-pointer relative z-10 select-none"
+                  className="bg-transparent hover:bg-[#FFB800]/10 border-2 border-[#FFB800] text-[#FFB800] active:scale-95 px-3.5 py-1 rounded-full flex items-center gap-2 font-black shadow-lg transition-all cursor-pointer relative z-10 select-none"
                   title="Voltar"
                 >
                   <ArrowLeft size={16} strokeWidth={3} />
-                  <span className="text-[6px] font-black tracking-widest uppercase">
+                  <span className="text-[9px] md:text-[11px] font-black tracking-widest uppercase">
                     Voltar
                   </span>
                 </button>

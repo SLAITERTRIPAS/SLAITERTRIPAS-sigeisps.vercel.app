@@ -35,6 +35,8 @@ import {
   ESTADOS_CIVIS,
   NIVEIS_ACADEMICOS,
   CATEGORIAS_FUNCIONARIOS,
+  CATEGORIAS_DOCENTES,
+  CATEGORIAS_CTAA,
   PROVINCIAS_LIST,
   SECOES,
   HABILITACOES_PROFISSIONAIS_LIST,
@@ -46,6 +48,7 @@ import {
   REPARTICOES,
   CURSOS,
   SECTORES,
+  getSetoresByDepartamento,
 } from "../../constants/formOptions";
 import MainHeader from "../bloco1_apresentacao/MainHeader";
 import {
@@ -167,8 +170,10 @@ interface IndividualProcessData {
   // Page 5: Attached Documents
   documentosAnexos: { data: string; descricao: string }[];
   ficheiros: File[];
-  fotoUrl: string;
+  sector?: string;
+  setoresAtribuidos?: string[];
   email?: string;
+  fotoUrl?: string;
 }
 
 const initialData: IndividualProcessData = {
@@ -1189,7 +1194,7 @@ export default function IndividualProcessForm({
                 </div>
 
                 {/* Nome Completo */}
-                <div className="flex flex-col md:col-span-5">
+                <div className="flex flex-col md:col-span-9">
                   <label className="text-[11px] font-bold text-gray-700 tracking-tight mb-1">
                     Nome Completo
                   </label>
@@ -1218,14 +1223,14 @@ export default function IndividualProcessForm({
                             nome: "",
                           }));
                       }}
-                      className="flex-grow bg-transparent border-none outline-none text-gray-900 text-sm font-medium focus:ring-0"
-                      placeholder="Raimundo Horissane Viag..."
+                      className="flex-grow bg-transparent border-none outline-none text-gray-900 text-base font-medium focus:ring-0"
+                      placeholder="Digite ou selecione o nome completo"
                     />
                   </div>
                 </div>
 
                 {/* Género */}
-                <div className="flex flex-col md:col-span-2">
+                <div className="flex flex-col md:col-span-3">
                   <label className="text-[11px] font-bold text-gray-700 tracking-tight mb-1">
                     Género
                   </label>
@@ -1244,7 +1249,7 @@ export default function IndividualProcessForm({
                 </div>
 
                 {/* Estado Civil */}
-                <div className="flex flex-col md:col-span-2">
+                <div className="flex flex-col md:col-span-3">
                   <label className="text-[11px] font-bold text-gray-700 tracking-tight mb-1">
                     Estado Civil
                   </label>
@@ -2415,41 +2420,15 @@ export default function IndividualProcessForm({
                   }}
                 >
                   <option value="">Selecione...</option>
-                  <option value="Nomeação Definitiva">
-                    Nomeação Definitiva
-                  </option>
-                  <option value="Nomeação definitiva">
-                    Nomeação definitiva
-                  </option>
-                  <option value="Nomeação Provisória">
-                    Nomeação Provisória
-                  </option>
-                  <option value="Nomeação provisória">
-                    Nomeação provisória
-                  </option>
-                  <option value="Contratado">Contratado</option>
-                  <option value="Quadro Efetivo">Quadro Efetivo</option>
                   <option value="Pertence ao quadro">Pertence ao quadro</option>
                   <option value="Não pertence ao quadro">
                     Não pertence ao quadro
                   </option>
-                  <option value="Difinitivo">Difinitivo</option>
-                  <option value="Definitivo">Definitivo</option>
-                  <option value="Reformado">Reformado</option>
                   {formData.vinculoContractual &&
                     ![
                       "",
-                      "Nomeação Definitiva",
-                      "Nomeação definitiva",
-                      "Nomeação Provisória",
-                      "Nomeação provisória",
-                      "Contratado",
-                      "Quadro Efetivo",
                       "Pertence ao quadro",
                       "Não pertence ao quadro",
-                      "Difinitivo",
-                      "Definitivo",
-                      "Reformado",
                     ].includes(formData.vinculoContractual) && (
                       <option value={formData.vinculoContractual}>
                         {formData.vinculoContractual}
@@ -2500,6 +2479,79 @@ export default function IndividualProcessForm({
                 </select>
               </div>
             </div>
+
+            {/* 4 CAMPOS DE SETORES DE TRABALHO PARA TÉCNICO DO SETOR */}
+            {(formData.cargoChefia === "Técnico do Setor" ||
+              formData.cargo === "Técnico do Setor" ||
+              (formData.cargoChefia || "").toLowerCase().includes("tecnico do setor") ||
+              (formData.cargoChefia || "").toLowerCase().includes("técnico do setor") ||
+              (formData.cargo || "").toLowerCase().includes("tecnico do setor") ||
+              (formData.cargo || "").toLowerCase().includes("técnico do setor") ||
+              (formData.cargoChefia || "").toLowerCase().includes("tecnico do sector") ||
+              (formData.cargoChefia || "").toLowerCase().includes("técnico do sector") ||
+              (formData.cargo || "").toLowerCase().includes("tecnico do sector") ||
+              (formData.cargo || "").toLowerCase().includes("técnico do sector")) && (
+              <div className="mt-4 p-3 bg-slate-50 border border-slate-300 rounded-md">
+                <div className="flex justify-between items-center mb-2 border-b border-slate-200 pb-1">
+                  <span className="font-bold text-xs uppercase text-blue-900">
+                    Setores de Trabalho do Técnico (Até 4):
+                  </span>
+                  <span className="text-[10px] text-slate-600 font-medium">
+                    Departamento: <strong>{formData.departamento || "Não selecionado"}</strong>
+                  </span>
+                </div>
+                {(() => {
+                  const deptSectors = getSetoresByDepartamento(formData.departamento);
+                  const currentSectors = formData.setoresAtribuidos || [
+                    formData.sector || "",
+                    "",
+                    "",
+                    "",
+                  ];
+
+                  const handleSectorChange = (idx: number, val: string) => {
+                    const updated = [...currentSectors];
+                    while (updated.length < 4) updated.push("");
+                    updated[idx] = val;
+                    handleInputChange("setoresAtribuidos", updated);
+                    if (idx === 0 || !formData.sector) {
+                      handleInputChange("sector", updated[0] || "");
+                    }
+                  };
+
+                  return (
+                    <div className="grid grid-cols-2 gap-3">
+                      {[0, 1, 2, 3].map((idx) => (
+                        <div key={idx} className="flex gap-2 items-center">
+                          <span className="text-xs font-bold text-slate-700 whitespace-nowrap">
+                            Setor {idx + 1}:
+                          </span>
+                          <input
+                            type="text"
+                            list={`ip-dept-sectors-${idx}`}
+                            className="flex-grow border-b border-black outline-none bg-transparent text-xs py-0.5"
+                            placeholder={
+                              deptSectors.length > 0
+                                ? `Selecione ou digite o setor ${idx + 1}...`
+                                : `Setor ${idx + 1}...`
+                            }
+                            value={currentSectors[idx] || ""}
+                            onChange={(e) => handleSectorChange(idx, e.target.value)}
+                          />
+                          <datalist id={`ip-dept-sectors-${idx}`}>
+                            {deptSectors.map((s, sIdx) => (
+                              <option key={`${s}-${sIdx}`} value={s}>
+                                {s}
+                              </option>
+                            ))}
+                          </datalist>
+                        </div>
+                      ))}
+                    </div>
+                  );
+                })()}
+              </div>
+            )}
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-4">
               <div className="flex gap-2 items-center">
@@ -2561,11 +2613,26 @@ export default function IndividualProcessForm({
                 <span className="font-bold whitespace-nowrap">Categoria:</span>
                 <SearchableSelect
                   className="flex-grow"
-                  options={CATEGORIAS_FUNCIONARIOS}
+                  options={
+                    formData.carreira === "Docente"
+                      ? CATEGORIAS_DOCENTES
+                      : formData.carreira === "CTA"
+                        ? CATEGORIAS_CTAA
+                        : CATEGORIAS_FUNCIONARIOS
+                  }
                   value={formData.categoria || ""}
                   onChange={(val) => {
                     handleInputChange("categoria", val);
-                    const resolvedRes = classifyTipo({ categoria: val });
+                    let resolvedRes = formData.carreira;
+                    if (CATEGORIAS_DOCENTES.includes(val) && val !== "Assistente") {
+                      resolvedRes = "Docente";
+                    } else if (["Técnico Superior", "Técnico Profissional", "Técnico"].includes(val)) {
+                      resolvedRes = "CTA";
+                    } else if (val === "Assistente" && !resolvedRes) {
+                      resolvedRes = "Docente";
+                    } else {
+                      resolvedRes = classifyTipo({ categoria: val, carreira: formData.carreira });
+                    }
                     handleInputChange("carreira", resolvedRes);
                     handleInputChange("tipoColaborador", resolvedRes);
                   }}

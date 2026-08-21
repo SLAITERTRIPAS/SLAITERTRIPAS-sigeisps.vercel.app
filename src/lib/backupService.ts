@@ -7,6 +7,7 @@ import {
   setDoc,
   writeBatch,
 } from "firebase/firestore";
+import { REPARTICOES, SECTORES, DEPARTAMENTOS } from "../constants/formOptions";
 
 interface BackupDocument {
   id: string;
@@ -132,6 +133,8 @@ export const SYSTEM_ORGAOS: SystemOrganInfo[] = [
       "configuracoes",
       "config_sistema",
       "drafts",
+      "produtosUnificados",
+      "pedidos",
     ],
   },
 ];
@@ -145,7 +148,9 @@ export const SYSTEM_DATA_AREAS = SYSTEM_ORGAOS.map((o) => ({
   collections: o.collections,
 }));
 
-export const ALL_SYSTEM_COLLECTIONS = SYSTEM_ORGAOS.flatMap((a) => a.collections);
+export const ALL_SYSTEM_COLLECTIONS = Array.from(
+  new Set(SYSTEM_ORGAOS.flatMap((a) => a.collections)),
+);
 
 export const COLLECTION_ALIASES: Record<string, string> = {
   "Colaboradores": "colaboradores",
@@ -153,8 +158,11 @@ export const COLLECTION_ALIASES: Record<string, string> = {
   "Historico_Chefias": "historico_chefias",
   "Utilizadores": "users",
   "Plano_Actividades": "matrix_activities",
+  "matrix_activities": "matrix_activities",
   "Actividades": "actividades",
+  "actividades": "actividades",
   "Plano_Actividades_Det": "plano_actividades",
+  "plano_actividades": "plano_actividades",
   "Eventos": "calendar_events",
   "Notas": "notes",
   "Expediente": "expedientes",
@@ -183,7 +191,72 @@ export const COLLECTION_ALIASES: Record<string, string> = {
   "Alunos": "alunos",
   "Matriculas": "matriculas",
   "Mensagens_Sistema": "messages",
+  "produtos_unificados": "produtosUnificados",
+  "produtosUnificados": "produtosUnificados",
+  "drafts": "drafts",
 };
+
+/**
+ * Função utilitária para normalizar e garantir integridade das atividades planificadas por setor
+ */
+function normalizePlannedActivity(actData: any): any {
+  if (!actData || typeof actData !== "object") return actData;
+  const clean = { ...actData };
+
+  // Garantir ano
+  if (!clean.ano) {
+    clean.ano = 2026;
+  }
+
+  // Garantir setor / repartição / departamento
+  const setorVal = clean.setor || clean.sector || clean.areaDeAfetacao || clean.reparticao || "";
+  const repVal = clean.reparticao || clean.setor || clean.areaDeAfetacao || "";
+  const deptVal = clean.departamento || clean.unidadeOrganica || "";
+  const dirVal = clean.direcao || clean.direccao || "";
+
+  if (!clean.setor && setorVal) clean.setor = setorVal;
+  if (!clean.reparticao && repVal) clean.reparticao = repVal;
+  if (!clean.areaDeAfetacao && (setorVal || repVal)) clean.areaDeAfetacao = setorVal || repVal;
+
+  // Se departamento estiver vazio, tentar inferir através das repartições conhecidas
+  if (!clean.departamento) {
+    for (const [dept, reps] of Object.entries(REPARTICOES)) {
+      if (
+        reps.some(
+          (r) =>
+            r.toLowerCase() === repVal.toLowerCase() ||
+            r.toLowerCase() === setorVal.toLowerCase() ||
+            repVal.toLowerCase().includes(r.toLowerCase()),
+        )
+      ) {
+        clean.departamento = dept;
+        break;
+      }
+    }
+  }
+
+  // Se direção estiver vazia, tentar inferir através do departamento
+  if (!clean.direcao && clean.departamento) {
+    for (const [dir, depts] of Object.entries(DEPARTAMENTOS)) {
+      if (
+        depts.some(
+          (d) =>
+            d.toLowerCase() === clean.departamento.toLowerCase() ||
+            clean.departamento.toLowerCase().includes(d.toLowerCase()),
+        )
+      ) {
+        clean.direcao = dir;
+        break;
+      }
+    }
+  }
+
+  if (!clean.status) {
+    clean.status = clean.tipoPlano === "Setorial" ? "setorial" : "planificacao";
+  }
+
+  return clean;
+}
 
 /**
  * Notifica a aplicação via evento sobre o estado do backup
@@ -515,20 +588,26 @@ export async function restoreFullBackup(
     });
 
     for (const collName of organ.collections) {
-      let docs: BackupDocument[] | null = null;
+      let docs: BackupDocument[] = [];
       for (const [key, value] of Object.entries(data)) {
         if (key.startsWith("_localStorage_") || key.startsWith("_metadata_")) continue;
         const normalized = COLLECTION_ALIASES[key] || key;
         if (normalized === collName && Array.isArray(value)) {
-          docs = value;
-          break;
+          docs = docs.concat(value);
         }
       }
 
-      if (!docs || docs.length === 0) continue;
+      if (docs.length === 0) continue;
 
       let collCount = 0;
       const restoredItemsForLocal: any[] = [];
+      const isActivityCollection = [
+        "matrix_activities",
+        "actividades",
+        "plano_actividades",
+        "drafts",
+        "institucional_plans",
+      ].includes(collName);
 
       for (let i = 0; i < docs.length; i += 500) {
         const chunk = docs.slice(i, i + 500);
@@ -540,10 +619,13 @@ export async function restoreFullBackup(
 
             chunk.forEach((docData) => {
               if (!docData || typeof docData !== "object") return;
-              const { id, ...rest } = docData as any;
+              let cleanItem = isActivityCollection
+                ? normalizePlannedActivity(docData)
+                : docData;
+              const { id, ...rest } = cleanItem as any;
               const targetId = id || "restored_" + Math.random().toString(36).substring(2, 9);
               const docRef = doc(db, collName, targetId);
-              batch.set(docRef, { ...rest, id: targetId }, { merge: true });
+              batch.set(docRef, { ...rest, id: targetId });
               batchCount++;
               restoredItemsForLocal.push({ ...rest, id: targetId });
             });
@@ -555,8 +637,11 @@ export async function restoreFullBackup(
             console.warn(`Aviso ao commitar batch no Firestore para ${collName}:`, batchErr);
             chunk.forEach((docData) => {
               if (docData && typeof docData === "object") {
-                const targetId = docData.id || "local_" + Math.random().toString(36).substring(2, 9);
-                restoredItemsForLocal.push({ ...docData, id: targetId });
+                let cleanItem = isActivityCollection
+                  ? normalizePlannedActivity(docData)
+                  : docData;
+                const targetId = (cleanItem as any).id || "local_" + Math.random().toString(36).substring(2, 9);
+                restoredItemsForLocal.push({ ...cleanItem, id: targetId });
                 collCount++;
                 totalRestored++;
               }
@@ -565,8 +650,11 @@ export async function restoreFullBackup(
         } else {
           chunk.forEach((docData) => {
             if (docData && typeof docData === "object") {
-              const targetId = docData.id || "local_" + Math.random().toString(36).substring(2, 9);
-              restoredItemsForLocal.push({ ...docData, id: targetId });
+              let cleanItem = isActivityCollection
+                ? normalizePlannedActivity(docData)
+                : docData;
+              const targetId = (cleanItem as any).id || "local_" + Math.random().toString(36).substring(2, 9);
+              restoredItemsForLocal.push({ ...cleanItem, id: targetId });
               collCount++;
               totalRestored++;
             }
@@ -589,6 +677,13 @@ export async function restoreFullBackup(
             }
           }
           localStorage.setItem(localKey, safeJSONStringify(mergedList));
+
+          // Se for coleção de atividades, sincronizar cópias de segurança em chaves legadas
+          if (collName === "matrix_activities") {
+            localStorage.setItem("sigep_matrix_activities", safeJSONStringify(mergedList));
+          } else if (collName === "actividades") {
+            localStorage.setItem("sigep_actividades", safeJSONStringify(mergedList));
+          }
         } catch (e) {
           console.error(`Erro ao salvar no LocalStorage para ${collName}:`, e);
         }
@@ -597,6 +692,53 @@ export async function restoreFullBackup(
       restoredStats[collName] = (restoredStats[collName] || 0) + collCount;
       organStats[organ.id] += collCount;
     }
+  }
+
+  // Restaurar quaisquer coleções adicionais no payload que não estejam mapeadas explicitamente
+  for (const [key, value] of Object.entries(data)) {
+    if (key.startsWith("_localStorage_") || key.startsWith("_metadata_")) continue;
+    const normalized = COLLECTION_ALIASES[key] || key;
+    if (restoredStats[normalized] !== undefined || !Array.isArray(value) || value.length === 0) continue;
+
+    const extraDocs: BackupDocument[] = value;
+    const restoredItemsForLocal: any[] = [];
+    let collCount = 0;
+
+    for (let i = 0; i < extraDocs.length; i += 500) {
+      const chunk = extraDocs.slice(i, i + 500);
+      if (db) {
+        try {
+          const batch = writeBatch(db);
+          chunk.forEach((docData) => {
+            if (!docData || typeof docData !== "object") return;
+            const { id, ...rest } = docData as any;
+            const targetId = id || "restored_" + Math.random().toString(36).substring(2, 9);
+            const docRef = doc(db, normalized, targetId);
+            batch.set(docRef, { ...rest, id: targetId });
+            restoredItemsForLocal.push({ ...rest, id: targetId });
+            collCount++;
+          });
+          await batch.commit();
+          totalRestored += collCount;
+        } catch (e) {
+          chunk.forEach((docData) => {
+            if (docData && typeof docData === "object") {
+              const targetId = (docData as any).id || "local_" + Math.random().toString(36).substring(2, 9);
+              restoredItemsForLocal.push({ ...docData, id: targetId });
+              collCount++;
+              totalRestored++;
+            }
+          });
+        }
+      }
+    }
+
+    if (restoredItemsForLocal.length > 0) {
+      try {
+        localStorage.setItem(`sigep_local_${normalized}`, safeJSONStringify(restoredItemsForLocal));
+      } catch (e) {}
+    }
+    restoredStats[normalized] = collCount;
   }
 
   dispatchBackupAlert({
@@ -666,7 +808,7 @@ export async function runAutomaticBackup(
         organStats: record.organStats,
         collectionStats: record.collectionStats,
         status: record.status,
-        backupData: jsonString.length < 800000 ? backupData : null,
+        backupData: backupData,
       };
       await setDoc(docRef, firestorePayload, { merge: true });
     }
@@ -674,31 +816,12 @@ export async function runAutomaticBackup(
     console.warn("Aviso ao salvar backup no Firestore:", e);
   }
 
-  // Guardar no LocalStorage (sem o payload pesado backupData para evitar QuotaExceededError)
-  const lightRecord: SystemBackupRecord = {
-    ...record,
-    backupData: undefined,
-  };
-
+  // Nunca guardar a cópia do backup no browser (LocalStorage) por questões de preservação e segurança de dados.
   try {
-    const existingStr = localStorage.getItem("sigep_automatic_backups");
-    let list: SystemBackupRecord[] = [];
-    if (existingStr) {
-      try { list = JSON.parse(existingStr); } catch (e) { list = []; }
-    }
-    list = list.filter((b) => b.id !== backupId);
-    list.unshift(lightRecord);
-    if (list.length > 10) list = list.slice(0, 10);
-
-    localStorage.setItem("sigep_automatic_backups", safeJSONStringify(list));
+    localStorage.removeItem("sigep_automatic_backups");
     localStorage.setItem("sigep_last_auto_backup_time", String(now.getTime()));
   } catch (e) {
-    console.error("Erro ao guardar backup automático no LocalStorage:", e);
-    try {
-      localStorage.setItem("sigep_automatic_backups", safeJSONStringify([lightRecord]));
-    } catch (err2) {
-      console.warn("Não foi possível guardar nem a versão leve no localStorage:", err2);
-    }
+    console.error("Erro ao gerir o tempo de backup no LocalStorage:", e);
   }
 
   dispatchBackupAlert({
@@ -736,15 +859,10 @@ export async function runAutomaticBackupIfNeeded(): Promise<SystemBackupRecord |
 export async function getStoredBackupsList(): Promise<SystemBackupRecord[]> {
   const map = new Map<string, SystemBackupRecord>();
 
+  // Nunca ler backups do browser, garantindo que obtemos apenas as versões preservadas no Firestore
   try {
-    const localStr = localStorage.getItem("sigep_automatic_backups");
-    if (localStr) {
-      const parsed: SystemBackupRecord[] = JSON.parse(localStr);
-      parsed.forEach((b) => map.set(b.id, b));
-    }
-  } catch (e) {
-    console.error("Erro ao ler backups locais:", e);
-  }
+    localStorage.removeItem("sigep_automatic_backups");
+  } catch(e) {}
 
   if (db) {
     try {

@@ -36,6 +36,7 @@ import SystemRegistrationForm from "../blocos/bloco5_sistema/SystemRegistrationF
 import LibraryVisitForm from "../blocos/bloco3_unidades_organicas/LibraryVisitForm";
 import AcaoOrcamentalView from "./AcaoOrcamentalView";
 import PlanoWorkflowView from "../blocos/bloco5_sistema/PlanoWorkflowView";
+import { SectorSelectionView } from "../blocos/bloco1_apresentacao/SectorSelectionView";
 import { MatrixActivity, Event, Nota, ServiceRequest, BookRegistration } from "../types";
 import { firestoreService } from "../lib/firestoreService";
 import { ErrorBoundary } from "./ErrorBoundary";
@@ -111,6 +112,7 @@ interface ViewRendererProps {
   financialData?: any;
   setFinancialData?: (data: any) => void;
   activities?: any[];
+  onSelectSector?: (sector: string) => void;
 }
 
 export const ViewRenderer: React.FC<ViewRendererProps> = ({
@@ -161,6 +163,7 @@ export const ViewRenderer: React.FC<ViewRendererProps> = ({
   financialData = [],
   setFinancialData = (_data?: any) => {},
   activities = [],
+  onSelectSector,
 }) => {
   if (!bootComplete) {
     return <SplashScreen user={extendedUser} isFirstLogin={false} onFinish={onBootComplete} initStatus={initStatus} />;
@@ -268,8 +271,46 @@ export const ViewRenderer: React.FC<ViewRendererProps> = ({
     case "login":
       return <LoginScreen onClose={goBack} onLogin={onLogin} onRegisterClick={() => onSetView("registration_form")} events={events} />;
 
+    case "sector_selection":
+      return (
+        <SectorSelectionView
+          user={extendedUser || user}
+          sectors={extendedUser?.setoresAtribuidos || user?.setoresAtribuidos || []}
+          onSelectSector={(sector) => {
+            if (onSelectSector) {
+              onSelectSector(sector);
+            } else {
+              if (setDashboardTitle) setDashboardTitle(sector);
+              if (onSetView) onSetView("dashboard");
+            }
+          }}
+          onBack={goBack}
+        />
+      );
+
     case "menu":
       if (extendedUser && !isSuperBossUser(extendedUser)) {
+        if (
+          extendedUser.setoresAtribuidos &&
+          Array.isArray(extendedUser.setoresAtribuidos) &&
+          extendedUser.setoresAtribuidos.length > 1
+        ) {
+          return (
+            <SectorSelectionView
+              user={extendedUser}
+              sectors={extendedUser.setoresAtribuidos}
+              onSelectSector={(sector) => {
+                if (onSelectSector) {
+                  onSelectSector(sector);
+                } else {
+                  if (setDashboardTitle) setDashboardTitle(sector);
+                  if (onSetView) onSetView("dashboard");
+                }
+              }}
+              onBack={goBack}
+            />
+          );
+        }
         const workspace = getUserWorkspace(extendedUser);
         if (workspace) {
           return (
@@ -656,6 +697,8 @@ export const ViewRenderer: React.FC<ViewRendererProps> = ({
           onBack={goBack}
         />
       );
+
+
 
     default:
       return (

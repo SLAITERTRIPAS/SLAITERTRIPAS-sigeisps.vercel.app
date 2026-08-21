@@ -751,7 +751,7 @@ export async function resequenceActivitiesAfterDelete(
   });
 
   const getNumericOrderVal = (act: any) => {
-    const code = act.referencia || act.codigoActividade || "";
+    const code = String(act.referencia || act.codigoActividade || "");
     const match = code.match(/(\d+)$/);
     if (match) {
       return parseInt(match[1], 10);
@@ -819,7 +819,7 @@ export async function resequenceActivitiesAfterDelete(
           hasChanges = true;
         }
       } else {
-        const match = act.referencia.match(/(.*?)-(\d+)$/);
+        const match = String(act.referencia || "").match(/(.*?)-(\d+)$/);
         if (match) {
           const newRef = `${match[1]}-${newNumStr}`;
           if (newRef !== act.referencia) {

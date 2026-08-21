@@ -156,6 +156,13 @@ export const getAuthorizedActivities = (activities: any[], user: any) => {
     const creator = String(a.createdBy || a.emailCriador || "").toLowerCase();
     if ((creator && creator === uEmail) || (a.userId && uId && a.userId === uId)) return true;
 
+    // Check if shared with user or their area
+    if (Array.isArray(a.sharedWith)) {
+      if (a.sharedWith.includes(uEmail) || (uId && a.sharedWith.includes(uId))) return true;
+      const uArea = String(user.setor || user.reparticao || user.departamento || user.direcao || "").toLowerCase().trim();
+      if (uArea && a.sharedWith.some((area: any) => String(area).toLowerCase().trim() === uArea)) return true;
+    }
+
     // Administrador de Sistema tem acesso total para fins de suporte e debug
     if (isSysAdmin) return true;
 
@@ -163,36 +170,42 @@ export const getAuthorizedActivities = (activities: any[], user: any) => {
     const aDept = String(a.departamento || "").trim();
     const aSector = String(a.setor || a.reparticao || "").trim();
 
-    // Se o utilizador tem permissão/jurisdição sobre a área (mesmo departamento/direção/curso), deve ver a atividade!
-    if (canAccessArea(user, aDir, aDept, aSector)) {
-      return true;
-    }
-
     const aDeptLower = aDept.toLowerCase();
     const aSectorLower = aSector.toLowerCase();
 
-    // Se pertence ao mesmo departamento ou setor do usuário logado
+    // STRICT DEPARTMENTAL PRIVACY:
+    // If NOT a SuperBoss/Admin/DPEP, user can ONLY see their own department's budget/activities
+    const isDPEP = getUserRequiredStatusLevel(user) === 5;
     const isSameDeptOrSector = 
       (uDept && aDeptLower && (aDeptLower.includes(uDept) || uDept.includes(aDeptLower))) ||
       (uSector && aSectorLower && (aSectorLower.includes(uSector) || uSector.includes(aSectorLower)));
 
-    // Se não for do mesmo departamento/setor, exige que esteja submetido/encaminhado (submetido === true ou status avançado)
-    if (!isSameDeptOrSector) {
-      const isSubmitted =
-        a.submetido === true ||
-        (a.status &&
-          a.status !== "setorial" &&
-          a.status !== "draft" &&
-          a.status !== "Não Submetido") ||
-        a.status === "pendente_monitoria";
-      if (!isSubmitted) return false;
+    if (!isSuperBossUser(user) && !isDPEP && !isSysAdmin) {
+      // Se não for chefe/diretor, vê APENAS o que ele próprio criou (conforme pedido pelo utilizador)
+      const userRoleStr = (user.title || user.cargo || user.cargoChefia || "").toLowerCase();
+      const userRoles = getRoles(userRoleStr);
+      const isBoss = userRoles.isBoss || userRoles.isDG || userRoles.isDC || userRoles.isCD || userRoles.isCR;
+
+      if (!isBoss) {
+        // Usuário comum: apenas o que ele criou
+        const isCreator = (creator && creator === uEmail) || (a.userId && uId && a.userId === uId);
+        if (!isCreator) return false;
+      }
+
+      if (!isSameDeptOrSector) {
+        // If not from the same department, check if it was specifically forwarded to this user/area
+        if (a.currentGabinete) {
+          const uArea = String(user.setor || user.reparticao || user.departamento || user.direcao || "").toLowerCase().trim();
+          const aGabinete = String(a.currentGabinete).toLowerCase();
+          if (uArea && (aGabinete.includes(uArea) || uArea.includes(aGabinete))) return true;
+        }
+        return false; // BLOQUEIO ESTRITO: Não vê nada fora do departamento
+      }
     }
 
-    // Se estiver tramitado para o gabinete/área atual do usuário, conceder acesso
-    if (a.currentGabinete) {
-      const uArea = String(user.setor || user.reparticao || user.departamento || user.direcao || "").toLowerCase().trim();
-      const aGabinete = String(a.currentGabinete).toLowerCase();
-      if (uArea && (aGabinete.includes(uArea) || uArea.includes(aGabinete))) return true;
+    // Se o utilizador tem permissão/jurisdição sobre a área (mesmo departamento/direção/curso), deve ver a atividade!
+    if (canAccessArea(user, aDir, aDept, aSector)) {
+      return true;
     }
 
     const activityLevel = getActivityStatusLevel(a.status);
@@ -276,9 +289,6 @@ export const isSuperBossUser = (user: any) => {
     user.cargo === "Administrador e Proprietario do Sistema"
   )
     return true;
-
-  const uNuit = (user.nuit || "").toString();
-  if (uNuit === "108164611") return true;
 
   const lowName = (user.name || user.nome || "").toLowerCase();
   if (lowName.includes("slaiter")) return true;

@@ -24,6 +24,8 @@ import {
   CURSOS,
   NIVEIS_ACADEMICOS,
   CATEGORIAS_FUNCIONARIOS,
+  CATEGORIAS_DOCENTES,
+  CATEGORIAS_CTAA,
   LISTA_FUNCOES,
   FUNCIONARIOS,
   HABILITACOES_PROFISSIONAIS_LIST,
@@ -992,6 +994,9 @@ export default function RegistarFuncionarioForm({
                     {nivel}
                   </option>
                 ))}
+                {nivelAcademico && !NIVEIS_ACADEMICOS.includes(nivelAcademico) && (
+                  <option value={nivelAcademico}>{nivelAcademico}</option>
+                )}
               </select>
             </div>
 
@@ -1018,16 +1023,68 @@ export default function RegistarFuncionarioForm({
                 onChange={(e) => {
                   const val = e.target.value;
                   setCategoria(val);
-                  const res = classifyTipo({ categoria: val });
-                  setCarreira(res);
+                  if (CATEGORIAS_DOCENTES.includes(val) && val !== "Assistente") {
+                    setCarreira("Docente");
+                  } else if (["Técnico Superior", "Técnico Profissional", "Técnico"].includes(val)) {
+                    setCarreira("CTA");
+                  } else if (val === "Assistente" && !carreira) {
+                    setCarreira("Docente");
+                  } else {
+                    const res = classifyTipo({ categoria: val, carreira });
+                    setCarreira(res);
+                  }
                 }}
               >
                 <option value="">Selecione...</option>
-                {CATEGORIAS_FUNCIONARIOS.map((c) => (
-                  <option key={c} value={c}>
-                    {c}
-                  </option>
-                ))}
+                {carreira === "Docente" ? (
+                  <>
+                    <optgroup label="Docentes">
+                      {CATEGORIAS_DOCENTES.map((c) => (
+                        <option key={`doc-${c}`} value={c}>
+                          {c}
+                        </option>
+                      ))}
+                    </optgroup>
+                  </>
+                ) : carreira === "CTA" ? (
+                  <>
+                    <optgroup label="CTAA">
+                      {CATEGORIAS_CTAA.map((c) => (
+                        <option key={`cta-${c}`} value={c}>
+                          {c}
+                        </option>
+                      ))}
+                    </optgroup>
+                  </>
+                ) : (
+                  <>
+                    <optgroup label="Docentes">
+                      {CATEGORIAS_DOCENTES.map((c) => (
+                        <option key={`all-doc-${c}`} value={c}>
+                          {c}
+                        </option>
+                      ))}
+                    </optgroup>
+                    <optgroup label="CTAA">
+                      {CATEGORIAS_CTAA.map((c) => (
+                        <option key={`all-cta-${c}`} value={c}>
+                          {c}
+                        </option>
+                      ))}
+                    </optgroup>
+                    <optgroup label="Outras">
+                      <option value="Proprietário e Programador do Sistema">
+                        Proprietário e Programador do Sistema
+                      </option>
+                    </optgroup>
+                  </>
+                )}
+                {categoria &&
+                  !CATEGORIAS_DOCENTES.includes(categoria) &&
+                  !CATEGORIAS_CTAA.includes(categoria) &&
+                  categoria !== "Proprietário e Programador do Sistema" && (
+                    <option value={categoria}>{categoria}</option>
+                  )}
               </select>
             </div>
 
@@ -1056,33 +1113,15 @@ export default function RegistarFuncionarioForm({
                 onChange={(e) => setVinculoContractual(e.target.value)}
               >
                 <option value="">Selecione...</option>
-                <option value="Nomeação Definitiva">Nomeação Definitiva</option>
-                <option value="Nomeação definitiva">Nomeação definitiva</option>
-                <option value="Nomeação Provisória">Nomeação Provisória</option>
-                <option value="Nomeação provisória">Nomeação provisória</option>
-                <option value="Contratado">Contratado</option>
-                <option value="Quadro Efetivo">Quadro Efetivo</option>
                 <option value="Pertence ao quadro">Pertence ao quadro</option>
                 <option value="Não pertence ao quadro">
                   Não pertence ao quadro
                 </option>
-                <option value="Difinitivo">Difinitivo</option>
-                <option value="Definitivo">Definitivo</option>
-                <option value="Reformado">Reformado</option>
                 {vinculoContractual &&
                   ![
                     "",
-                    "Nomeação Definitiva",
-                    "Nomeação definitiva",
-                    "Nomeação Provisória",
-                    "Nomeação provisória",
-                    "Contratado",
-                    "Quadro Efetivo",
                     "Pertence ao quadro",
                     "Não pertence ao quadro",
-                    "Difinitivo",
-                    "Definitivo",
-                    "Reformado",
                   ].includes(vinculoContractual) && (
                     <option value={vinculoContractual}>
                       {vinculoContractual}

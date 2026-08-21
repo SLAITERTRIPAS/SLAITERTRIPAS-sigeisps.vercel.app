@@ -19,8 +19,10 @@ import {
   CURSOS,
   NIVEIS_ACADEMICOS,
   CATEGORIAS_FUNCIONARIOS,
+  CATEGORIAS_DOCENTES,
   LISTA_CARGOS_CHEFIA,
   ESTADOS_CIVIS,
+  getSetoresByDepartamento,
 } from "../../constants/formOptions";
 import { generateCollaboratorId } from "../../lib/utils";
 
@@ -247,7 +249,7 @@ export default function FormularioAlocacaoDocente({
 
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4 text-xs font-semibold">
             {/* Nº Processo / ID Único */}
-            <div className="space-y-1">
+            <div className="space-y-1 sm:col-span-1">
               <label className="text-[10px] font-black text-red-600 uppercase tracking-wider">
                 Nº Processo / ID Único *
               </label>
@@ -260,7 +262,7 @@ export default function FormularioAlocacaoDocente({
             </div>
 
             {/* Nome Completo */}
-            <div className="space-y-1">
+            <div className="space-y-1 sm:col-span-1 md:col-span-3">
               <label className="text-[10px] font-bold text-slate-700">
                 Nome Completo
               </label>
@@ -268,7 +270,8 @@ export default function FormularioAlocacaoDocente({
                 type="text"
                 value={formData.nome}
                 onChange={(e) => handleChange("nome", e.target.value)}
-                className="w-full px-3 py-2.5 bg-white border border-slate-200 rounded-xl text-slate-800 font-medium focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full px-3 py-2.5 bg-white border border-slate-200 rounded-xl text-slate-800 font-medium text-base focus:outline-none focus:ring-2 focus:ring-blue-500"
+                placeholder="Digite o nome completo"
               />
             </div>
 
@@ -828,18 +831,18 @@ export default function FormularioAlocacaoDocente({
                     onChange={(e) => handleChange("categoria", e.target.value)}
                     className="w-full px-3 py-2.5 bg-white border border-slate-200 rounded-xl text-slate-800 font-medium appearance-none pr-8 focus:outline-none focus:ring-2 focus:ring-blue-500"
                   >
-                    <option value="Selecione...">Selecione...</option>
-                    <option value="Professor Catedrático">
-                      Professor Catedrático
-                    </option>
-                    <option value="Professor Associado">
-                      Professor Associado
-                    </option>
-                    <option value="Professor Auxiliar">Professor Auxiliar</option>
-                    <option value="Assistente">Assistente</option>
-                    <option value="Assistente Estagiário">
-                      Assistente Estagiário
-                    </option>
+                    <option value="">Selecione...</option>
+                    {CATEGORIAS_DOCENTES.map((c) => (
+                      <option key={c} value={c}>
+                        {c}
+                      </option>
+                    ))}
+                    {formData.categoria &&
+                      !CATEGORIAS_DOCENTES.includes(formData.categoria) && (
+                        <option value={formData.categoria}>
+                          {formData.categoria}
+                        </option>
+                      )}
                   </select>
                   <ChevronDown
                     size={16}
@@ -933,10 +936,6 @@ export default function FormularioAlocacaoDocente({
                   >
                     <option value="Pertence ao quadro">Pertence ao quadro</option>
                     <option value="Não pertence ao quadro">Não pertence ao quadro</option>
-                    <option value="Contratado">Contratado</option>
-                    <option value="Colaborador Externo">Colaborador Externo</option>
-                    <option value="Nomeação Definitiva">Nomeação Definitiva</option>
-                    <option value="Nomeação Provisória">Nomeação Provisória</option>
                   </select>
                   <ChevronDown
                     size={16}
@@ -983,12 +982,19 @@ export default function FormularioAlocacaoDocente({
                     }
                     className="w-full px-3 py-2.5 bg-white border border-slate-200 rounded-xl text-slate-800 font-medium appearance-none pr-8 focus:outline-none focus:ring-2 focus:ring-blue-500"
                   >
-                    <option value="Selecione...">Selecione...</option>
-                    <option value="Licenciatura">Licenciatura</option>
-                    <option value="Mestrado">Mestrado</option>
-                    <option value="Doutoramento">Doutoramento</option>
-                    <option value="Pós-Graduação">Pós-Graduação</option>
-                    <option value="Bacharelato">Bacharelato</option>
+                    <option value="">Selecione...</option>
+                    {NIVEIS_ACADEMICOS.map((nivel) => (
+                      <option key={nivel} value={nivel}>
+                        {nivel}
+                      </option>
+                    ))}
+                    {formData.nivelAcademico &&
+                      !NIVEIS_ACADEMICOS.includes(formData.nivelAcademico) &&
+                      formData.nivelAcademico !== "Selecione..." && (
+                        <option value={formData.nivelAcademico}>
+                          {formData.nivelAcademico}
+                        </option>
+                      )}
                   </select>
                   <ChevronDown
                     size={16}
@@ -1013,67 +1019,69 @@ export default function FormularioAlocacaoDocente({
           </div>
         </div>
 
-        {/* SECTION FOR DISCIPLINAS LECCIONADAS (ATÉ 4) AS A SEPARATE CONTAINER */}
-        <div className="relative rounded-[2rem] border-2 border-slate-900 p-6 pt-8 bg-white shadow-sm">
-          <div className="absolute -top-3.5 left-6 bg-white px-3 flex items-center gap-2 font-black text-xs text-blue-900 tracking-tight uppercase">
-            <span className="w-1 h-4 bg-blue-600 rounded-full inline-block"></span>
-            DISCIPLINAS LECCIONADAS (ATÉ 4)
+        {/* SECTION FOR DISCIPLINAS LECCIONADAS (ATÉ 4) AS A SEPARATE CONTAINER - Apenas para Docentes */}
+        {formData.carreira !== "CTA" && (
+          <div className="relative rounded-[2rem] border-2 border-slate-900 p-6 pt-8 bg-white shadow-sm">
+            <div className="absolute -top-3.5 left-6 bg-white px-3 flex items-center gap-2 font-black text-xs text-blue-900 tracking-tight uppercase">
+              <span className="w-1 h-4 bg-blue-600 rounded-full inline-block"></span>
+              DISCIPLINAS LECCIONADAS (ATÉ 4)
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs font-semibold">
+              <div className="space-y-1">
+                <label className="text-[9px] font-black text-slate-400 uppercase tracking-wider">
+                  DISCIPLINA 1
+                </label>
+                <input
+                  type="text"
+                  placeholder="Disciplina 1"
+                  value={formData.disciplina1}
+                  onChange={(e) => handleChange("disciplina1", e.target.value)}
+                  className="w-full px-3 py-2.5 bg-white border border-slate-200 rounded-xl text-slate-800 font-medium focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-[9px] font-black text-slate-400 uppercase tracking-wider">
+                  DISCIPLINA 2
+                </label>
+                <input
+                  type="text"
+                  placeholder="Disciplina 2"
+                  value={formData.disciplina2}
+                  onChange={(e) => handleChange("disciplina2", e.target.value)}
+                  className="w-full px-3 py-2.5 bg-white border border-slate-200 rounded-xl text-slate-800 font-medium focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-[9px] font-black text-slate-400 uppercase tracking-wider">
+                  DISCIPLINA 3
+                </label>
+                <input
+                  type="text"
+                  placeholder="Disciplina 3"
+                  value={formData.disciplina3}
+                  onChange={(e) => handleChange("disciplina3", e.target.value)}
+                  className="w-full px-3 py-2.5 bg-white border border-slate-200 rounded-xl text-slate-800 font-medium focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-[9px] font-black text-slate-400 uppercase tracking-wider">
+                  DISCIPLINA 4
+                </label>
+                <input
+                  type="text"
+                  placeholder="Disciplina 4"
+                  value={formData.disciplina4}
+                  onChange={(e) => handleChange("disciplina4", e.target.value)}
+                  className="w-full px-3 py-2.5 bg-white border border-slate-200 rounded-xl text-slate-800 font-medium focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+            </div>
           </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs font-semibold">
-            <div className="space-y-1">
-              <label className="text-[9px] font-black text-slate-400 uppercase tracking-wider">
-                DISCIPLINA 1
-              </label>
-              <input
-                type="text"
-                placeholder="Disciplina 1"
-                value={formData.disciplina1}
-                onChange={(e) => handleChange("disciplina1", e.target.value)}
-                className="w-full px-3 py-2.5 bg-white border border-slate-200 rounded-xl text-slate-800 font-medium focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
-            </div>
-
-            <div className="space-y-1">
-              <label className="text-[9px] font-black text-slate-400 uppercase tracking-wider">
-                DISCIPLINA 2
-              </label>
-              <input
-                type="text"
-                placeholder="Disciplina 2"
-                value={formData.disciplina2}
-                onChange={(e) => handleChange("disciplina2", e.target.value)}
-                className="w-full px-3 py-2.5 bg-white border border-slate-200 rounded-xl text-slate-800 font-medium focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
-            </div>
-
-            <div className="space-y-1">
-              <label className="text-[9px] font-black text-slate-400 uppercase tracking-wider">
-                DISCIPLINA 3
-              </label>
-              <input
-                type="text"
-                placeholder="Disciplina 3"
-                value={formData.disciplina3}
-                onChange={(e) => handleChange("disciplina3", e.target.value)}
-                className="w-full px-3 py-2.5 bg-white border border-slate-200 rounded-xl text-slate-800 font-medium focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
-            </div>
-
-            <div className="space-y-1">
-              <label className="text-[9px] font-black text-slate-400 uppercase tracking-wider">
-                DISCIPLINA 4
-              </label>
-              <input
-                type="text"
-                placeholder="Disciplina 4"
-                value={formData.disciplina4}
-                onChange={(e) => handleChange("disciplina4", e.target.value)}
-                className="w-full px-3 py-2.5 bg-white border border-slate-200 rounded-xl text-slate-800 font-medium focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
-            </div>
-          </div>
-        </div>
+        )}
 
         {/* SECTION 5: Cargo de Chefia e Confiança */}
         <div className="relative rounded-[2rem] border-2 border-slate-900 p-6 pt-8 bg-white shadow-sm">

@@ -89,6 +89,7 @@ import {
 import { ActivityTableHeader } from "./plano/ActivityTableHeader";
 import { ActivityTableRow } from "./plano/ActivityTableRow";
 import ActivityForm from "../bloco5_sistema/ActivityForm";
+import { DPEPDashboard } from "../../components/DPEPDashboard";
 import {
   DEPARTAMENTOS,
   REPARTICOES,
@@ -2706,35 +2707,68 @@ export default function PlanoWorkflowView({
   };
 
   const getReparticoesAndSectors = (deptKey: string) => {
-    const list: { name: string; type: "Repartição" | "Setor" | "Geral" }[] = [];
-    const deptsReparticoes = REPARTICOES[deptKey] || [];
+    const list: { name: string; type: "Repartição" | "Setor" | "Geral"; parentReparticao?: string }[] = [];
+    
+    // Encontrar chave correspondente em REPARTICOES
+    const allDeptKeys = Object.keys(REPARTICOES);
+    const matchedKey = allDeptKeys.find(
+      (k) =>
+        k.toLowerCase() === deptKey.toLowerCase() ||
+        k.toLowerCase().includes(deptKey.toLowerCase()) ||
+        deptKey.toLowerCase().includes(k.toLowerCase()),
+    ) || deptKey;
+
+    const deptsReparticoes = REPARTICOES[matchedKey] || [];
 
     deptsReparticoes.forEach((rep) => {
       list.push({ name: rep, type: "Repartição" });
       const sectorsOfRep = SECTORES[rep] || [];
       sectorsOfRep.forEach((sec) => {
-        list.push({ name: sec, type: "Setor" });
+        list.push({ name: sec, type: "Setor", parentReparticao: rep });
       });
     });
 
-    // Also look through activities for any other custom repartitions or sectors for this department
-    filteredActivities.forEach((a) => {
-      if (
-        (a.status as any) === "departamento" &&
-        (a.departamento === deptKey || !a.departamento)
-      ) {
-        if (a.reparticao && !list.some((item) => item.name === a.reparticao)) {
+    // Analisar atividades e planos para recolher outros setores/repartições subordinados
+    const activitiesToScan = [...(filteredActivities || []), ...(rawActivities || [])];
+    activitiesToScan.forEach((a) => {
+      const matchDept =
+        !a.departamento ||
+        a.departamento.toLowerCase() === deptKey.toLowerCase() ||
+        a.departamento.toLowerCase() === matchedKey.toLowerCase() ||
+        a.departamento.toLowerCase().includes(deptKey.toLowerCase()) ||
+        deptKey.toLowerCase().includes(a.departamento.toLowerCase());
+
+      if (matchDept) {
+        const sectorCandidate = a.setor || a.areaDeAfetacao;
+        const repCandidate = a.reparticao;
+
+        if (
+          repCandidate &&
+          !list.some((item) => item.name.toLowerCase() === repCandidate.toLowerCase())
+        ) {
           const type =
-            a.reparticao.toUpperCase().includes("SETOR") ||
-            a.reparticao.toUpperCase().includes("SECTOR")
+            repCandidate.toUpperCase().includes("SETOR") ||
+            repCandidate.toUpperCase().includes("SECTOR")
               ? "Setor"
               : "Repartição";
-          list.push({ name: a.reparticao, type: type as any });
+          list.push({ name: repCandidate, type: type as any });
+        }
+
+        if (
+          sectorCandidate &&
+          !list.some((item) => item.name.toLowerCase() === sectorCandidate.toLowerCase())
+        ) {
+          const type =
+            sectorCandidate.toUpperCase().includes("REPARTIÇÃO") ||
+            sectorCandidate.toUpperCase().includes("REPARTICAO")
+              ? "Repartição"
+              : "Setor";
+          list.push({ name: sectorCandidate, type: type as any, parentReparticao: repCandidate });
         }
       }
     });
 
-    // Make sure we have a "Sectores Gerais"
+    // Garantir que temos "Sectores Gerais"
     if (!list.some((item) => item.name === "Sectores Gerais")) {
       list.push({ name: "Sectores Gerais", type: "Geral" });
     }
@@ -3864,32 +3898,40 @@ export default function PlanoWorkflowView({
 
         {/* Novo Ecrã de Boas Vindas/Seleção de Fluxo */}
         {workflowMode === "landing" && (
-          <div className="flex flex-col items-center justify-center min-h-screen bg-slate-50 p-6">
-            <div className="max-w-xl w-full bg-white rounded-3xl shadow-xl p-10 text-center border border-slate-100">
-              <h2 className="text-2xl font-black text-slate-900 mb-8">
-                Gestão de Planos de Atividades
-              </h2>
-              <div className="space-y-4">
-                <button
-                  onClick={() => {
-                    setWorkflowMode("planning");
-                    setSelectedYear(new Date().getFullYear() + 1);
-                  }}
-                  className="w-full p-6 bg-slate-900 text-white rounded-xl font-bold hover:bg-slate-800 transition-all text-left flex items-center justify-between"
-                >
-                  Pretende planificar para o ano N+1?
-                  <ChevronRight size={20} />
-                </button>
-                <button
-                  onClick={() => setWorkflowMode("consulting")}
-                  className="w-full p-6 bg-amber-500 text-white rounded-xl font-bold hover:bg-amber-600 transition-all text-left flex items-center justify-between"
-                >
-                  Pretende consultar o plano de atividade do ano atual?
-                  <ChevronRight size={20} />
-                </button>
+          isDPEP ? (
+            <DPEPDashboard 
+              activities={rawActivities.filter(a => Number(a.ano) === selectedYear)} 
+              onSelectWorkflow={(mode) => setWorkflowMode(mode)}
+              selectedYear={selectedYear}
+            />
+          ) : (
+            <div className="flex flex-col items-center justify-center min-h-screen bg-slate-50 p-6">
+              <div className="max-w-xl w-full bg-white rounded-3xl shadow-xl p-10 text-center border border-slate-100">
+                <h2 className="text-2xl font-black text-slate-900 mb-8">
+                  Gestão de Planos de Atividades
+                </h2>
+                <div className="space-y-4">
+                  <button
+                    onClick={() => {
+                      setWorkflowMode("planning");
+                      setSelectedYear(new Date().getFullYear() + 1);
+                    }}
+                    className="w-full p-6 bg-slate-900 text-white rounded-xl font-bold hover:bg-slate-800 transition-all text-left flex items-center justify-between"
+                  >
+                    Pretende planificar para o ano N+1?
+                    <ChevronRight size={20} />
+                  </button>
+                  <button
+                    onClick={() => setWorkflowMode("consulting")}
+                    className="w-full p-6 bg-amber-500 text-white rounded-xl font-bold hover:bg-amber-600 transition-all text-left flex items-center justify-between"
+                  >
+                    Pretende consultar o plano de atividade do ano atual?
+                    <ChevronRight size={20} />
+                  </button>
+                </div>
               </div>
             </div>
-          </div>
+          )
         )}
 
         {workflowMode !== "landing" && (
@@ -4931,20 +4973,20 @@ export default function PlanoWorkflowView({
                       const sectorActs = filteredActivities.filter((a) => {
                         if (sector === "Sectores Gerais") {
                           return (
-                            !a.reparticao || a.reparticao === "Sectores Gerais"
+                            (!a.reparticao && !a.setor) ||
+                            a.reparticao === "Sectores Gerais" ||
+                            a.setor === "Sectores Gerais"
                           );
                         }
-                        return a.reparticao === sector;
+                        return (
+                          a.reparticao === sector ||
+                          a.setor === sector ||
+                          a.areaDeAfetacao === sector ||
+                          (a.reparticao && a.reparticao.toLowerCase() === sector.toLowerCase()) ||
+                          (a.setor && a.setor.toLowerCase() === sector.toLowerCase()) ||
+                          (a.areaDeAfetacao && a.areaDeAfetacao.toLowerCase() === sector.toLowerCase())
+                        );
                       });
-
-                      const isPredefined =
-                        (REPARTICOES[activeDeptKey] || []).includes(sector) ||
-                        Object.values(SECTORES).some((arr) =>
-                          arr.includes(sector),
-                        ) ||
-                        sector === "Sectores Gerais";
-
-                      if (sectorActs.length === 0 && !isPredefined) return null;
 
                       return (
                         <div
@@ -5227,84 +5269,146 @@ export default function PlanoWorkflowView({
                           return isMatchDept && (a.status as any) === "departamento";
                         });
 
+                        const subordinateSectors = getReparticoesAndSectors(dept);
+
                         return (
                           <div
                             key={dept}
-                            className="bg-white border border-slate-100 rounded-2xl overflow-hidden shadow-sm"
+                            className="bg-white border border-slate-100 rounded-2xl overflow-hidden shadow-sm space-y-4"
                           >
-                          <InstitutionalHeader 
-                            unidadeName={user.unidadeOrganica}
-                            direcaoName={user.direcao}
-                            departamentoName={dept}
-                            year={selectedYear} 
-                          />
-                          <div className="bg-slate-900 text-white p-6 rounded-t-2xl flex flex-col md:flex-row justify-between items-center gap-4">
-                            <div>
+                            <InstitutionalHeader 
+                              unidadeName={user.unidadeOrganica}
+                              direcaoName={user.direcao}
+                              departamentoName={dept}
+                              year={selectedYear} 
+                            />
+                            <div className="bg-slate-900 text-white p-6 rounded-2xl flex flex-col md:flex-row justify-between items-center gap-4">
+                              <div>
                                 <span className="inline-block bg-emerald-500/20 text-emerald-300 text-[10px] font-black uppercase tracking-widest px-3 py-1 rounded-full mb-2">
-                                    Orçamento do Departamento
+                                  Orçamento do Departamento
                                 </span>
                                 <h4 className="text-xl font-black uppercase tracking-tight text-white">
-                                    {dept} - (Meu Plano)
+                                  {dept} - (Planos Recebidos)
                                 </h4>
-                                <p className="text-[10px] text-slate-400 mt-1">O valor total de todas as atividades planejadas para o departamento.</p>
-                            </div>
-                            <div className="bg-white/5 border border-white/10 p-4 rounded-xl text-right">
-                                <div className="text-[9px] font-bold text-slate-400 uppercase tracking-wider">Atividades (Sem Salários)</div>
+                                <p className="text-[10px] text-slate-400 mt-1">
+                                  Setores e repartições subordinados a este departamento.
+                                </p>
+                              </div>
+                              <div className="bg-white/5 border border-white/10 p-4 rounded-xl text-right">
+                                <div className="text-[9px] font-bold text-slate-400 uppercase tracking-wider">Total Recebido</div>
                                 <div className="text-lg font-black text-emerald-400 font-mono">
-                                    {deptActs.reduce((acc, a) => acc + getActivityTotal(a), 0).toLocaleString("pt-MZ", {
+                                  {deptActs.reduce((acc, a) => acc + getActivityTotal(a), 0).toLocaleString("pt-MZ", {
                                     minimumFractionDigits: 2,
                                     maximumFractionDigits: 2,
-                                    })}{" "}
-                                    MZN
+                                  })}{" "}
+                                  MZN
                                 </div>
-                                <div className="text-[9px] text-slate-400 mt-0.5">{deptActs.length} {deptActs.length === 1 ? "Atividade" : "Atividades"}</div>
+                                <div className="text-[9px] text-slate-400 mt-0.5">
+                                  {deptActs.length} {deptActs.length === 1 ? "Atividade" : "Atividades"} em {subordinateSectors.length} setores
+                                </div>
+                              </div>
                             </div>
-                          </div>
 
-                            <div className="overflow-x-auto print:overflow-visible border border-slate-200 rounded-3xl shadow-sm mb-3">
-                              <table className="w-full text-left border-collapse min-w-[1900px] print:min-w-full font-sans text-xs print-table-compact">
-                                <ActivityTableHeader isDPEP={isDPEP} />
-                                <tbody className="divide-y divide-slate-200 text-slate-700 font-medium whitespace-nowrap">
-                                  {deptActs.filter(Boolean).map((activity, idx) => (
-                                    <ActivityTableRow
-                                      key={activity.id}
-                                      activity={activity}
-                                      onViewHistory={setActivityForHistory}
-                                      index={idx}
-                                      isDPEP={isDPEP}
-                                      user={user}
-                                      isBossOrAdmin={isBossOrAdmin}
-                                      getActivityTotal={getActivityTotal}
-                                      onUpdateExecution={onUpdateExecution}
-                                      onUpdateRelatorio={onUpdateRelatorio}
-                                      actions={
-                                        <div className="flex justify-center items-center gap-2">
-                                          <button
-                                            onClick={() => {
-                                              setEditingActivity(activity);
-                                              setShowAddForm(true);
-                                            }}
-                                            className="p-1 text-slate-400 hover:text-blue-600 hover:bg-slate-100 rounded"
-                                            title="Visualizar"
-                                          >
-                                            <Eye size={13} />
-                                          </button>
-                                        </div>
-                                      }
-                                    />
-                                  ))}
-                                  {deptActs.length === 0 && (
-                                    <tr>
-                                      <td
-                                        colSpan={37}
-                                        className="p-6 text-center text-slate-400 text-xs italic font-medium"
-                                      >
-                                        Nenhuma atividade pendente para este departamento.
-                                      </td>
-                                    </tr>
-                                  )}
-                                </tbody>
-                              </table>
+                            {/* Lista de todos os setores e repartições subordinados a este departamento */}
+                            <div className="space-y-4 px-2 pb-2">
+                              {subordinateSectors.map((item) => {
+                                const sector = item.name;
+                                const sectorActs = deptActs.filter((a) => {
+                                  if (sector === "Sectores Gerais") {
+                                    return (
+                                      (!a.reparticao && !a.setor) ||
+                                      a.reparticao === "Sectores Gerais" ||
+                                      a.setor === "Sectores Gerais"
+                                    );
+                                  }
+                                  return (
+                                    a.reparticao === sector ||
+                                    a.setor === sector ||
+                                    a.areaDeAfetacao === sector ||
+                                    (a.reparticao && a.reparticao.toLowerCase() === sector.toLowerCase()) ||
+                                    (a.setor && a.setor.toLowerCase() === sector.toLowerCase()) ||
+                                    (a.areaDeAfetacao && a.areaDeAfetacao.toLowerCase() === sector.toLowerCase())
+                                  );
+                                });
+
+                                return (
+                                  <div
+                                    key={sector}
+                                    className="bg-slate-50/70 border border-slate-200/80 rounded-2xl overflow-hidden shadow-xs"
+                                  >
+                                    <div className="p-4 bg-slate-100/80 border-b border-slate-200 flex items-center justify-between">
+                                      <div className="flex items-center gap-2">
+                                        <span
+                                          className={`text-[10px] font-black uppercase px-2 py-0.5 rounded-full ${item.type === "Repartição" ? "bg-blue-100 text-blue-800" : item.type === "Setor" ? "bg-amber-100 text-amber-800" : "bg-slate-200 text-slate-700"}`}
+                                        >
+                                          {item.type}
+                                        </span>
+                                        <span className="text-xs font-black text-slate-800 uppercase tracking-wide">
+                                          {sector}
+                                        </span>
+                                      </div>
+                                      <div className="flex items-center gap-3">
+                                        <span className="text-[11px] font-bold text-slate-600 font-mono">
+                                          {sectorActs.reduce((acc, a) => acc + getActivityTotal(a), 0).toLocaleString("pt-MZ", {
+                                            minimumFractionDigits: 2,
+                                            maximumFractionDigits: 2,
+                                          })}{" "}
+                                          MZN
+                                        </span>
+                                        <span className="text-[10px] font-bold text-blue-700 bg-blue-100 px-2.5 py-0.5 rounded-full">
+                                          {sectorActs.length} {sectorActs.length === 1 ? "Atividade" : "Atividades"}
+                                        </span>
+                                      </div>
+                                    </div>
+
+                                    <div className="overflow-x-auto print:overflow-visible">
+                                      <table className="w-full text-left border-collapse min-w-[1900px] print:min-w-full font-sans text-xs print-table-compact">
+                                        <ActivityTableHeader isDPEP={isDPEP} />
+                                        <tbody className="divide-y divide-slate-200 text-slate-700 font-medium whitespace-nowrap">
+                                          {sectorActs.map((activity, idx) => (
+                                            <ActivityTableRow
+                                              key={activity.id}
+                                              activity={activity}
+                                              onViewHistory={setActivityForHistory}
+                                              index={idx}
+                                              isDPEP={isDPEP}
+                                              user={user}
+                                              isBossOrAdmin={isBossOrAdmin}
+                                              getActivityTotal={getActivityTotal}
+                                              onUpdateExecution={onUpdateExecution}
+                                              onUpdateRelatorio={onUpdateRelatorio}
+                                              actions={
+                                                <div className="flex justify-center items-center gap-2">
+                                                  <button
+                                                    onClick={() => {
+                                                      setEditingActivity(activity);
+                                                      setShowAddForm(true);
+                                                    }}
+                                                    className="p-1 text-slate-400 hover:text-blue-600 hover:bg-slate-100 rounded"
+                                                    title="Visualizar"
+                                                  >
+                                                    <Eye size={13} />
+                                                  </button>
+                                                </div>
+                                              }
+                                            />
+                                          ))}
+                                          {sectorActs.length === 0 && (
+                                            <tr>
+                                              <td
+                                                colSpan={37}
+                                                className="p-4 text-center text-slate-400 text-xs italic font-medium"
+                                              >
+                                                Nenhuma atividade registada ou submetida para este(a) {item.type.toLowerCase()} até ao momento.
+                                              </td>
+                                            </tr>
+                                          )}
+                                        </tbody>
+                                      </table>
+                                    </div>
+                                  </div>
+                                );
+                              })}
                             </div>
                           </div>
                         );

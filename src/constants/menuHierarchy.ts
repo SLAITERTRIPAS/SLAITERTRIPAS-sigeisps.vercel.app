@@ -153,7 +153,7 @@ export const baseMenuItems = [
     ],
   },
   {
-    title: "Unidade Orgânica",
+    title: "Serviços Centrais",
     icon: Briefcase,
     color: "bg-gray-600",
     items: [

@@ -173,6 +173,27 @@ export default function GestaoProdutosPrecosView() {
   const handleSaveEdit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!editingProduct || !editingProduct.nome) return;
+    if (!editingProduct.especificacao || !editingProduct.especificacao.trim()) {
+      alert("O preenchimento das especificações técnicas é obrigatório para cada produto inserido.");
+      return;
+    }
+    if (!editingProduct.unidade || !editingProduct.unidade.trim()) {
+      alert("O preenchimento dos detalhes / unidade é obrigatório para cada produto inserido.");
+      return;
+    }
+    
+    // Check for duplicate names
+    const newNameTrimmed = editingProduct.nome.trim().toLowerCase();
+    const originalNameTrimmed = (editingProduct._originalNome || "").trim().toLowerCase();
+    
+    if (newNameTrimmed !== originalNameTrimmed) {
+      const exists = products.some(p => p.nome.trim().toLowerCase() === newNameTrimmed);
+      if (exists) {
+        alert("Já existe um produto com este nome. Por favor, escolha outro nome ou edite o produto existente.");
+        return;
+      }
+    }
+
     if (editingProduct._originalNome && editingProduct._originalNome !== editingProduct.nome) {
       await deleteUnifiedProduct(editingProduct._originalNome);
     }
@@ -195,6 +216,22 @@ export default function GestaoProdutosPrecosView() {
   const handleAddNew = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newProduct.nome || !newProduct.nome.trim()) return;
+    if (!newProduct.especificacao || !newProduct.especificacao.trim()) {
+      alert("O preenchimento das especificações técnicas é obrigatório para cada produto inserido.");
+      return;
+    }
+    if (!newProduct.unidade || !newProduct.unidade.trim()) {
+      alert("O preenchimento dos detalhes / unidade é obrigatório para cada produto inserido.");
+      return;
+    }
+
+    const newNameTrimmed = newProduct.nome.trim().toLowerCase();
+    const exists = products.some(p => p.nome.trim().toLowerCase() === newNameTrimmed);
+    if (exists) {
+      alert("Já existe um produto com este nome. Por favor, escolha outro nome ou edite o produto existente.");
+      return;
+    }
+
     const cat = getCategoryForRubricaOrNecessidade(newProduct.rubrica, newProduct.necessidade);
     await saveUnifiedProduct({
       nome: newProduct.nome.trim(),
@@ -505,11 +542,24 @@ export default function GestaoProdutosPrecosView() {
           /* AGRUPADO POR RÚBRICA & NECESSIDADE */
           <div className="space-y-6">
             {RUBRICAS.filter((r) => filterRubrica === "TODAS" || r === filterRubrica).map((rubricaName) => {
-              const necessidadesList = getNecessidadesOptions(rubricaName);
+                            const necessidadesList = getNecessidadesOptions(rubricaName);
+              
+              let filteredNecessidadesList = necessidadesList;
+              if (filterNecessidade !== "TODAS") {
+                filteredNecessidadesList = necessidadesList.filter((necName) => {
+                  const formattedNec = formatNecessidadeWithCode(necName, rubricaName);
+                  return (
+                    necName.trim().toLowerCase() === filterNecessidade.trim().toLowerCase() ||
+                    formattedNec.trim().toLowerCase() === filterNecessidade.trim().toLowerCase()
+                  );
+                });
+              }
+
               const rubricaProducts = filteredProducts.filter(
                 (p) => (p.rubrica || "").trim().toLowerCase() === rubricaName.trim().toLowerCase()
               );
 
+              if (filteredNecessidadesList.length === 0) return null;
               if (rubricaProducts.length === 0 && filterRubrica !== "TODAS") return null;
 
               return (
@@ -525,7 +575,7 @@ export default function GestaoProdutosPrecosView() {
                   </div>
 
                   <div className="space-y-4">
-                    {necessidadesList.map((necName) => {
+                    {filteredNecessidadesList.map((necName) => {
                       const necProds = rubricaProducts.filter((p) => {
                         const pCodeNec = formatNecessidadeWithCode(p.necessidade || "", p.rubrica);
                         const formattedNec = formatNecessidadeWithCode(necName, rubricaName);

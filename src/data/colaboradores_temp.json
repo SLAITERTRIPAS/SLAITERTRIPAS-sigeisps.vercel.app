@@ -1,33 +1,6 @@
 [
   {
     "ord": 1,
-    "nome": "SLAITER TRIPAS",
-    "genero": "M",
-    "dataNascimento": "1993-12-23",
-    "localNascimento": {
-      "pais": "Moçambique",
-      "provincia": "Tete",
-      "distrito": "Cidade de Tete"
-    },
-    "nuit": "108164611",
-    "numeroBI": "110101798743F",
-    "nivelAcademico": "Técnico",
-    "areaFormacao": "Software e Hardware",
-    "categoria": "Técnico Profissional de Informática",
-    "carreira": "Técnico Profissional de Informática",
-    "tipoContrato": "Tempo inteiro",
-    "vinculoContractual": "Pertence ao quadro",
-    "tipo": "CTA",
-    "unidade": "Unidade Orgânica",
-    "estado": "Ativo",
-    "email": "fttripas@gmail.com",
-    "usuario": "fttripas@gmail.com",
-    "efetivo": true,
-    "cargo": "Programador do Sistema",
-    "id": "FTV108164611"
-  },
-  {
-    "ord": 2,
     "nome": "Abelízio Artiel F. Mutondo",
     "genero": "M",
     "dataNascimento": "1984-09-06",

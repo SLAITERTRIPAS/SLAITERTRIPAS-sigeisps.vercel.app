@@ -20,13 +20,16 @@ const dbId =
     : firebaseConfig.firestoreDatabaseId;
 
 // Use a global singleton pattern to prevent multiple Firestore instances during HMR
-const dbIdToUse = dbId || undefined;
+const dbIdToUse = dbId || "(default)";
 let dbInstance;
 
 try {
   // @ts-ignore
   if (!globalThis._firebase_db) {
-    dbInstance = getFirestore(app, dbIdToUse);
+    dbInstance = initializeFirestore(app, {
+      experimentalForceLongPolling: true,
+    }, dbIdToUse === "(default)" ? undefined : dbIdToUse);
+    
     // @ts-ignore
     globalThis._firebase_db = dbInstance;
   } else {
@@ -38,7 +41,7 @@ try {
     "Firestore singleton initialization error, falling back to getFirestore:",
     e,
   );
-  dbInstance = getFirestore(app);
+  dbInstance = getFirestore(app, dbIdToUse === "(default)" ? undefined : dbIdToUse);
 }
 
 export const db = dbInstance;

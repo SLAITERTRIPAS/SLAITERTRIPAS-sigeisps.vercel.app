@@ -179,6 +179,24 @@ export default function App() {
   const [showBackupModal, setShowBackupModal] = useState(false);
   const [isMinimized, setIsMinimized] = useState(false);
   const [backupAlert, setBackupAlert] = useState<{ message: string; type: string } | null>(null);
+  const [showSectorSelector, setShowSectorSelector] = useState(false);
+  const [assignedSectorsForLogin, setAssignedSectorsForLogin] = useState<string[]>([]);
+  const [selectedSectorForLogin, setSelectedSectorForLogin] = useState<string>("");
+
+  const handleSelectSector = (sector: string) => {
+    if (!sector) return;
+    const updatedUser = { ...user, setor: sector };
+    setUser(updatedUser);
+    localStorage.setItem("sigep_user", safeJSONStringify(updatedUser));
+    setDashboardTitle(sector);
+    setShowSectorSelector(false);
+    setView("dashboard");
+  };
+
+  const handleConfirmSectorSelection = () => {
+    if (!selectedSectorForLogin) return;
+    handleSelectSector(selectedSectorForLogin);
+  };
 
   // Sistema de Backup Automático de 12 horas e Alertas de Progresso
   useEffect(() => {
@@ -418,7 +436,7 @@ export default function App() {
           console.log(
             "Semeando Administrador SLAITER TRIPAS no Firestore...",
           );
-          const docRef = doc(db, "users", "ST108164611");
+          const docRef = doc(db, "users", "ST849547771");
           await setDoc(
             docRef,
             { ...adminData, createdAt: new Date().toISOString() },
@@ -868,14 +886,21 @@ export default function App() {
       // Administradores continuam a ir para o menu principal para gestão total
       setView("menu");
     } else {
-      // Utilizadores comuns são enviados diretamente para a sua área de afetação
-      const workspace = getUserWorkspace(userData);
-      if (workspace) {
-        setDashboardTitle(workspace);
-        setView("dashboard");
+      if (userData.setoresAtribuidos && Array.isArray(userData.setoresAtribuidos) && userData.setoresAtribuidos.length > 1) {
+        setAssignedSectorsForLogin(userData.setoresAtribuidos);
+        setSelectedSectorForLogin(userData.setoresAtribuidos[0]);
+        setDashboardTitle(userData.departamento || userData.direcao || "Departamento de Património");
+        setView("sector_selection");
       } else {
-        // Fallback caso não tenha área definida (não deve acontecer com dados integrados)
-        setView("menu");
+        // Utilizadores comuns são enviados diretamente para a sua área de afetação
+        const workspace = getUserWorkspace(userData);
+        if (workspace) {
+          setDashboardTitle(workspace);
+          setView("dashboard");
+        } else {
+          // Fallback caso não tenha área definida (não deve acontecer com dados integrados)
+          setView("menu");
+        }
       }
     }
   };
@@ -1260,11 +1285,19 @@ export default function App() {
 
     // Fallback estrutural se a pilha de histórico estiver vazia
     if (view === "dashboard") {
-      if (subMenuStack.length > 0) {
+      if (
+        extendedUser?.setoresAtribuidos &&
+        Array.isArray(extendedUser.setoresAtribuidos) &&
+        extendedUser.setoresAtribuidos.length > 1
+      ) {
+        setView("sector_selection");
+      } else if (subMenuStack.length > 0) {
         setView("submenu");
       } else {
         setView("menu");
       }
+    } else if (view === "sector_selection") {
+      setView("login");
     } else if (view === "submenu") {
       if (subMenuStack.length > 1) {
         setSubMenuStack((prev) => prev.slice(0, -1));
@@ -1413,6 +1446,7 @@ export default function App() {
       reparticao: targetSource?.reparticao || user.reparticao,
       setor: targetSource?.setor || user.setor,
       areaDeAfetacao: targetSource?.areaDeAfetacao || user.areaDeAfetacao,
+      setoresAtribuidos: targetSource?.setoresAtribuidos || user.setoresAtribuidos || [],
     };
   }, [user?.email, user?.nuit, processos?.length, colaboradores?.length]);
 
@@ -1542,6 +1576,7 @@ export default function App() {
                 onUpdateUser={(id, data) => firestoreService.users.update(id, data)}
                 onLogin={handleLogin}
                 initStatus={initStatus}
+                onSelectSector={handleSelectSector}
               />
             </div>
           </motion.div>

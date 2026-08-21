@@ -144,7 +144,7 @@ export const EstruturaExplorer = () => {
       ],
     },
     {
-      title: "Unidade Orgânica",
+      title: "Serviços Centrais",
       type: "Unidade Estrutural",
       direcoes: [
         {

@@ -361,6 +361,62 @@ export const SECTORES: Record<string, string[]> = {
   "Repartição de Arquivo": ["Único"],
 };
 
+/**
+ * Obtém todos os setores e repartições alocados a um determinado departamento.
+ */
+export function getSetoresByDepartamento(dept?: string | null): string[] {
+  if (!dept) return [];
+  const cleanDept = dept.trim();
+  const lowerDept = cleanDept.toLowerCase();
+  const results: string[] = [];
+
+  // 1. Procurar correspondência exata ou aproximada em REPARTICOES
+  Object.entries(REPARTICOES).forEach(([key, items]) => {
+    const lowerKey = key.toLowerCase();
+    if (lowerKey === lowerDept || lowerKey.includes(lowerDept) || lowerDept.includes(lowerKey)) {
+      items.forEach((item) => {
+        results.push(item);
+        if (SECTORES[item]) {
+          results.push(...SECTORES[item]);
+        }
+      });
+    }
+  });
+
+  // 2. Procurar em DEPARTAMENTOS
+  Object.entries(DEPARTAMENTOS).forEach(([_, deptList]) => {
+    if (deptList.some((d) => d.toLowerCase() === lowerDept || lowerDept.includes(d.toLowerCase()))) {
+      const match = deptList.find((d) => d.toLowerCase() === lowerDept || lowerDept.includes(d.toLowerCase()));
+      if (match && REPARTICOES[match]) {
+        results.push(...REPARTICOES[match]);
+        REPARTICOES[match].forEach((r) => {
+          if (SECTORES[r]) results.push(...SECTORES[r]);
+        });
+      }
+    }
+  });
+
+  // 3. Procurar em SECTORES
+  Object.entries(SECTORES).forEach(([secKey, secItems]) => {
+    const lowerSecKey = secKey.toLowerCase();
+    if (lowerSecKey.includes(lowerDept) || lowerDept.includes(lowerSecKey)) {
+      results.push(...secItems);
+    }
+  });
+
+  // 4. Filtrar termos que não são setores de trabalho (como "Único", "Chefe de...", "Membros...")
+  const filtered = results.filter((s) => {
+    if (!s || typeof s !== "string") return false;
+    const l = s.trim().toLowerCase();
+    if (l === "único" || l === "unico") return false;
+    if (l.startsWith("chefe do ") || l.startsWith("chefe de ") || l.startsWith("chefe da ") || l.startsWith("diretor ")) return false;
+    if (l.startsWith("membros do ")) return false;
+    return true;
+  });
+
+  return Array.from(new Set(filtered));
+}
+
 export const CURSOS: Record<string, string[]> = {
   "Departamento de Pesquisa e Extensão": [
     "Pesquisa Científica",
@@ -574,11 +630,67 @@ export const PROVINCIAS = {
 };
 
 export const PROVINCIAS_DISTRITOS = PROVINCIAS;
-export const LISTA_FUNCOES: string[] = [
-  "Agente",
-  "Agente de Serviço",
-  "Auxiliar Administrativo",
+
+export const VINCULOS_CONTRATUAIS: string[] = [
+  "Pertence ao quadro",
+  "Não pertence ao quadro",
+];
+
+export const FUNCOES_CTA: string[] = [
+  "Secretaria / Registo Académico",
+  "Recursos Humanos",
+  "Administração e Finanças",
+  "Biblioteca",
+  "Informática",
+  "Laboratórios e Áreas Técnicas",
   "Motorista",
+  "Guarda / Agente de Segurança",
+  "Jardineiro",
+  "Agente de Serviço",
+  "Auxiliar de Manutenção",
+  "Auxiliar Administrativo",
+  "Assistente Técnico",
+  "Técnico Profissional",
+  "Técnico Superior",
+  "Técnico",
+];
+
+export const FUNCOES_DOCENTES: string[] = [
+  "Docente",
+  "Docente Universitário",
+  "Professor Catedrático",
+  "Professor Associado",
+  "Professor Auxiliar",
+  "Assistente Universitário",
+  "Assistente",
+  "Investigador",
+];
+
+export const LISTA_FUNCOES: string[] = [
+  "Secretaria / Registo Académico",
+  "Recursos Humanos",
+  "Administração e Finanças",
+  "Biblioteca",
+  "Informática",
+  "Laboratórios e Áreas Técnicas",
+  "Motorista",
+  "Guarda / Agente de Segurança",
+  "Jardineiro",
+  "Agente de Serviço",
+  "Auxiliar de Manutenção",
+  "Docente",
+  "Docente Universitário",
+  "Professor Catedrático",
+  "Professor Associado",
+  "Professor Auxiliar",
+  "Assistente Universitário",
+  "Assistente",
+  "Investigador",
+  "Auxiliar Administrativo",
+  "Assistente Técnico",
+  "Técnico Profissional",
+  "Técnico Superior",
+  "Técnico",
   "Guarda",
   "Mecânico",
   "Eletricista",
@@ -586,18 +698,6 @@ export const LISTA_FUNCOES: string[] = [
   "Serralheiro",
   "Carpinteiro",
   "Operário Qualificado",
-  "Assistente Técnico",
-  "Técnico Profissional",
-  "Técnico Superior",
-  "Técnico Superior N1",
-  "Técnico Superior N2",
-  "Especialista",
-  "Investigador",
-  "Assistente Universitário",
-  "Docente",
-  "Professor Auxiliar",
-  "Professor Associado",
-  "Professor Catedrático",
 ];
 
 export const LISTA_CARGOS_CHEFIA: string[] = [
@@ -3052,41 +3152,47 @@ export const ESTADOS_CIVIS = [
 ];
 
 export const NIVEIS_ACADEMICOS = [
-  "Nenhum / Sem Formação",
-  "Ensino Primário (1º Grau)",
-  "Ensino Primário (2º Grau)",
-  "Técnico Básico",
-  "Ensino Básico",
-  "Técnico Médio",
-  "Ensino Secundário",
-  "Ensino Médio / Técnico Médio",
-  "Técnico Profissional",
-  "Bacharelato",
-  "Licenciatura",
-  "Pós-Graduação",
+  "Doutoramento (PhD)",
   "Mestrado",
-  "Doutoramento",
-  "Pós-Doutoramento",
+  "Licenciatura",
+  "Bacharelato",
+  "Curso Superior",
+  "Técnico Profissional",
+  "Técnico Médio",
+  "Ensino Médio",
+  "Técnico Básico",
+  "Ensino Secundário Geral",
+  "Ensino Primário",
+  "Sem escolaridade formal",
 ];
+
+export const CATEGORIAS_DOCENTES = [
+  "Professor Catedrático",
+  "Professor Associado",
+  "Professor Auxiliar",
+  "Assistente Universitário",
+  "Assistente",
+];
+
+export const CATEGORIAS_CTAA = [
+  "Técnico Superior",
+  "Técnico Profissional",
+  "Técnico",
+  "Assistente",
+];
+
+export const CATEGORIAS_CTA = CATEGORIAS_CTAA;
 
 export const CATEGORIAS_FUNCIONARIOS = [
   "Proprietário e Programador do Sistema",
-  "Docente Universitário",
-  "CTA",
+  "Professor Catedrático",
+  "Professor Associado",
+  "Professor Auxiliar",
+  "Assistente Universitário",
   "Técnico Superior",
   "Técnico Profissional",
-  "Assistente Técnico",
-  "Auxiliar Administrativo",
-  "Operário Qualificado",
-  "Motorista",
-  "Agente de Serviço",
-  "Agente",
-  "Guarda",
-  "Mecânico",
-  "Eletricista",
-  "Pedreiro",
-  "Serralheiro",
-  "Carpinteiro",
+  "Técnico",
+  "Assistente",
 ];
 
 export const PROVINCIAS_LIST = [

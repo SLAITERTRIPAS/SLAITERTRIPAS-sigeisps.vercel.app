@@ -58,7 +58,7 @@ export function sanitizeForJSON(obj: any, seen = new WeakSet()): any {
   if (type === "bigint") return obj.toString();
   if (type === "function" || type === "symbol") return undefined;
 
-  // DOM / React / Event / Class instance / Image check
+  // Global Check for DOM / React / Event / Class instance / Image / Firebase Internal
   if (
     (typeof Node !== "undefined" && obj instanceof Node) ||
     (typeof Window !== "undefined" && obj instanceof Window) ||
@@ -71,19 +71,19 @@ export function sanitizeForJSON(obj: any, seen = new WeakSet()): any {
      obj.constructor !== Object && 
      obj.constructor !== Array && 
      obj.constructor.name && 
-     obj.constructor.name !== 'Object' && 
-     obj.constructor.name !== 'Array')
+     obj.constructor.name !== "Object" && 
+     obj.constructor.name !== "Array" &&
+     // Aggressive filter for any minified or internal constructor
+     (obj.constructor.name.length <= 3 || 
+      obj.constructor.name.includes("Firebase") || 
+      obj.constructor.name.includes("Firestore") || 
+      obj.constructor.name.includes("Auth")))
   ) {
-    return undefined;
-  }
-
-  // Firestore Timestamp
-  if (typeof obj.toDate === "function") {
-    try {
-      return obj.toDate().toISOString();
-    } catch (e) {
-      return null;
+    // If it's a Firestore Timestamp, we want its value
+    if (typeof obj.toDate === "function") {
+      try { return obj.toDate().toISOString(); } catch (e) { return null; }
     }
+    return undefined;
   }
 
   // Firestore DocumentReference / Query / Firestore instance / Firebase Auth User
@@ -136,6 +136,7 @@ export const getCircularReplacer = () => {
       return undefined;
     }
     if (typeof value === "object") {
+      // Aggressive check for non-plain objects
       if (
         (typeof Node !== "undefined" && value instanceof Node) ||
         (typeof Window !== "undefined" && value instanceof Window) ||
@@ -148,15 +149,15 @@ export const getCircularReplacer = () => {
          value.constructor !== Object && 
          value.constructor !== Array && 
          value.constructor.name && 
-         value.constructor.name !== 'Object' && 
-         value.constructor.name !== 'Array')
+         value.constructor.name !== "Object" && 
+         value.constructor.name !== "Array" &&
+         (value.constructor.name.length <= 3 || 
+          value.constructor.name.includes("Firebase") || 
+          value.constructor.name.includes("Firestore") || 
+          value.constructor.name.includes("Auth")))
       ) {
         if (typeof value.toDate === "function") {
-          try {
-            return value.toDate().toISOString();
-          } catch (e) {
-            return null;
-          }
+          try { return value.toDate().toISOString(); } catch (e) { return null; }
         }
         if (value.path) return String(value.path);
         if (value.id) return String(value.id);

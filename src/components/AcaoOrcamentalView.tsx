@@ -13,12 +13,16 @@ import {
   HelpCircle,
   Printer,
   ArrowLeft,
+  LayoutGrid,
+  ChevronRight,
 } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import { InstitutionalHeader } from "./InstitutionalHeader";
 import { printElementById } from "../lib/printUtils";
-import { UNIDADES_ORGANICAS_SISTEMA, DEPARTAMENTOS } from "../constants/formOptions";
+import { UNIDADES_ORGANICAS_SISTEMA, DEPARTAMENTOS, getSetoresByDepartamento } from "../constants/formOptions";
 import { isSuperBossUser, canAccessArea, getAuthorizedActivities } from "../lib/auth";
+
+const formatCurrency = (val) => new Intl.NumberFormat("pt-MZ", { style: "currency", currency: "MZN" }).format(val || 0);
 
 interface AcaoOrcamentalViewProps {
   user: any;
@@ -438,6 +442,13 @@ export default function AcaoOrcamentalView({
     );
   }, [user, title]);
 
+  // Source of Truth for Security: Filter activities once at the top
+  const authorizedActivities = useMemo(() => {
+    if (!activities) return [];
+    if (isPlanificacaoOrDPEP || isSuperBossUser(user)) return activities;
+    return getAuthorizedActivities(activities, user);
+  }, [activities, user, isPlanificacaoOrDPEP]);
+
   // Extrair unidades organizacionais por nível
   const levelUnits = useMemo(() => {
     const direcoes = new Set<string>();
@@ -445,7 +456,7 @@ export default function AcaoOrcamentalView({
     const reparticoes = new Set<string>();
     const setores = new Set<string>();
 
-    activities.forEach((act) => {
+    authorizedActivities.forEach((act) => {
       const d = act.direcao || act.direccao || act.unidadeOrganica;
       if (d && typeof d === "string" && d.trim()) direcoes.add(d.trim());
 
@@ -528,16 +539,13 @@ export default function AcaoOrcamentalView({
 
   // Filtrar atividades conforme o Nível Estrutural e a Unidade Selecionada
   const sectorActivities = useMemo(() => {
-    let baseActivities = activities;
+    // Usar atividades já filtradas por autorização básica
+    let baseActivities = authorizedActivities;
 
     // Se o utilizador não for da Planificação / DPEP, restringe à sua área (Departamento estrito ou Direção)
     if (!isPlanificacaoOrDPEP) {
       const roleStr = String(user?.cargo || user?.title || user?.role || user?.cargoChefia || "").toLowerCase();
       const isDirector = roleStr.includes("diretor") || roleStr.includes("director");
-
-      // STRICT AUTHORIZATION ENFORCEMENT FIRST
-      // This ensures a department cannot see another department's budget
-      baseActivities = getAuthorizedActivities(activities, user);
 
       if (isDirector && userDirecao) {
         // Direção: visualiza e consolida o orçamento de todos os departamentos sob a alçada da direção
@@ -640,6 +648,31 @@ export default function AcaoOrcamentalView({
   }, [sectorActivities]);
 
   // Coletânea completa e agrupamento detalhado por Rúbricas e Necessidades
+  // Total Geral de Absolutamente Todas as Atividades do Sistema (para o Teto Institucional)
+  const totalGeralAbsoluto = useMemo(() => {
+    // Para garantir a privacidade, se o utilizador não for DPEP/SuperBoss,
+    // o "Total Geral" deve ser apenas o total do seu departamento, e não o institucional.
+    return authorizedActivities.reduce((sum, act) => {
+      let actVal = 0;
+      let hasRub = false;
+      if (Array.isArray(act.rubricas) && act.rubricas.length > 0) {
+        const rSum = act.rubricas.reduce(
+          (acc: number, r: any) =>
+            acc + Number(r.valorTotal || r.total || r.valor || r.precoTotal || 0),
+          0
+        );
+        if (rSum > 0) {
+          actVal += rSum;
+          hasRub = true;
+        }
+      }
+      if (!hasRub) {
+        actVal += Number(act.valor || act.orcamentoTotal || act.valorTotal || act.orcamento || act.custoTotal || 0);
+      }
+      return sum + actVal;
+    }, 0);
+  }, [activities]);
+
   const rubricasBreakdown = useMemo(() => {
     const rubricaMap: {
       [rubricaName: string]: {
@@ -684,6 +717,12 @@ export default function AcaoOrcamentalView({
           ).trim();
           const rubricaStr = getOfficialRubricaLabel(rawRub, necessidadeStr);
           const prodName = String(r.nomeProduto || r.especificacao || r.produto || r.item || "").trim();
+          
+          // Normalização para evitar repetições por caixa alta/baixa
+          const rubricaKey = rubricaStr.toUpperCase();
+          const necessityKey = necessidadeStr.toUpperCase();
+          const productKey = prodName.toUpperCase();
+          
           const qty = Number(r.quantidade || r.qtd || 1);
           const val = Number(
             r.valorTotal || r.total || r.valor || r.precoTotal || r.custo || 0
@@ -692,18 +731,18 @@ export default function AcaoOrcamentalView({
 
           if (val >= 0 || qty >= 0) {
             hasProcessedRubrica = true;
-            if (!rubricaMap[rubricaStr]) {
-              rubricaMap[rubricaStr] = {
+            if (!rubricaMap[rubricaKey]) {
+              rubricaMap[rubricaKey] = {
                 rubricaName: rubricaStr,
                 totalValorRubrica: 0,
                 necessidadesMap: {},
               };
             }
-            rubricaMap[rubricaStr].totalValorRubrica += val;
+            rubricaMap[rubricaKey].totalValorRubrica += val;
 
-            const necKey = `${necessidadeStr}${prodName ? ` - [Produto: ${prodName}]` : ""}`;
-            if (!rubricaMap[rubricaStr].necessidadesMap[necKey]) {
-              rubricaMap[rubricaStr].necessidadesMap[necKey] = {
+            const necKey = `${necessityKey}${productKey ? `_#_${productKey}` : ""}`;
+            if (!rubricaMap[rubricaKey].necessidadesMap[necKey]) {
+              rubricaMap[rubricaKey].necessidadesMap[necKey] = {
                 necessidadeName: necessidadeStr,
                 nomeProduto: prodName,
                 quantidadeTotal: 0,
@@ -713,9 +752,9 @@ export default function AcaoOrcamentalView({
                 especificacao: r.especificacao || "",
               };
             }
-            rubricaMap[rubricaStr].necessidadesMap[necKey].quantidadeTotal += qty;
-            rubricaMap[rubricaStr].necessidadesMap[necKey].valorTotalNecessidade += val;
-            rubricaMap[rubricaStr].necessidadesMap[necKey].atividadesCount += 1;
+            rubricaMap[rubricaKey].necessidadesMap[necKey].quantidadeTotal += qty;
+            rubricaMap[rubricaKey].necessidadesMap[necKey].valorTotalNecessidade += val;
+            rubricaMap[rubricaKey].necessidadesMap[necKey].atividadesCount += 1;
           }
         });
       }
@@ -744,27 +783,29 @@ export default function AcaoOrcamentalView({
           ).trim();
           const rubricaStr = getOfficialRubricaLabel(rawRub, necessidadeStr);
           const qty = Number(act.quantidade || act.qtd || 1);
+          const rubricaKey = rubricaStr.toUpperCase();
+          const necessityKey = necessidadeStr.toUpperCase();
 
-          if (!rubricaMap[rubricaStr]) {
-            rubricaMap[rubricaStr] = {
+          if (!rubricaMap[rubricaKey]) {
+            rubricaMap[rubricaKey] = {
               rubricaName: rubricaStr,
               totalValorRubrica: 0,
               necessidadesMap: {},
             };
           }
-          rubricaMap[rubricaStr].totalValorRubrica += val;
+          rubricaMap[rubricaKey].totalValorRubrica += val;
 
-          if (!rubricaMap[rubricaStr].necessidadesMap[necessidadeStr]) {
-            rubricaMap[rubricaStr].necessidadesMap[necessidadeStr] = {
+          if (!rubricaMap[rubricaKey].necessidadesMap[necessityKey]) {
+            rubricaMap[rubricaKey].necessidadesMap[necessityKey] = {
               necessidadeName: necessidadeStr,
               quantidadeTotal: 0,
               valorTotalNecessidade: 0,
               atividadesCount: 0,
             };
           }
-          rubricaMap[rubricaStr].necessidadesMap[necessidadeStr].quantidadeTotal += qty;
-          rubricaMap[rubricaStr].necessidadesMap[necessidadeStr].valorTotalNecessidade += val;
-          rubricaMap[rubricaStr].necessidadesMap[necessidadeStr].atividadesCount += 1;
+          rubricaMap[rubricaKey].necessidadesMap[necessityKey].quantidadeTotal += qty;
+          rubricaMap[rubricaKey].necessidadesMap[necessityKey].valorTotalNecessidade += val;
+          rubricaMap[rubricaKey].necessidadesMap[necessityKey].atividadesCount += 1;
         }
       }
     });
@@ -1232,9 +1273,12 @@ export default function AcaoOrcamentalView({
           if (val >= 0 || qty >= 0) {
             hasRubrica = true;
             const targetLabel = getOfficialRubricaLabel(rubStr, necStr);
+            const rubKey = targetLabel.toUpperCase();
+            const necKeyNormalized = necStr.toUpperCase();
+            const prodKeyNormalized = prodName.toUpperCase();
 
-            if (!map[targetLabel]) {
-              map[targetLabel] = {
+            if (!map[rubKey]) {
+              map[rubKey] = {
                 code: targetLabel.substring(0, 6),
                 label: targetLabel,
                 totalQuant: 0,
@@ -1243,12 +1287,12 @@ export default function AcaoOrcamentalView({
               };
             }
 
-            map[targetLabel].totalQuant += qty;
-            map[targetLabel].totalValor += val;
+            map[rubKey].totalQuant += qty;
+            map[rubKey].totalValor += val;
 
-            const itemKey = `${necStr}${prodName ? ` [Produto: ${prodName}]` : ""}`;
-            if (!map[targetLabel].itemsMap[itemKey]) {
-              map[targetLabel].itemsMap[itemKey] = {
+            const itemKey = `${necKeyNormalized}_#_${prodKeyNormalized}`;
+            if (!map[rubKey].itemsMap[itemKey]) {
+              map[rubKey].itemsMap[itemKey] = {
                 label: necStr,
                 nomeProduto: prodName,
                 quant: 0,
@@ -1258,9 +1302,9 @@ export default function AcaoOrcamentalView({
                 count: 0,
               };
             }
-            map[targetLabel].itemsMap[itemKey].quant += qty;
-            map[targetLabel].itemsMap[itemKey].valor += val;
-            map[targetLabel].itemsMap[itemKey].count += 1;
+            map[rubKey].itemsMap[itemKey].quant += qty;
+            map[rubKey].itemsMap[itemKey].valor += val;
+            map[rubKey].itemsMap[itemKey].count += 1;
           }
         });
       }
@@ -1275,8 +1319,11 @@ export default function AcaoOrcamentalView({
 
         if (val >= 0 || qty >= 0) {
           const targetLabel = getOfficialRubricaLabel(rubStr, necStr);
-          if (!map[targetLabel]) {
-            map[targetLabel] = {
+          const rubKey = targetLabel.toUpperCase();
+          const necKeyNormalized = (necStr || "Atividade Planificada").toUpperCase();
+
+          if (!map[rubKey]) {
+            map[rubKey] = {
               code: targetLabel.substring(0, 6),
               label: targetLabel,
               totalQuant: 0,
@@ -1285,21 +1332,20 @@ export default function AcaoOrcamentalView({
             };
           }
 
-          map[targetLabel].totalQuant += qty;
-          map[targetLabel].totalValor += val;
+          map[rubKey].totalQuant += qty;
+          map[rubKey].totalValor += val;
 
-          const itemKey = necStr || "Atividade Planificada";
-          if (!map[targetLabel].itemsMap[itemKey]) {
-            map[targetLabel].itemsMap[itemKey] = {
-              label: itemKey,
+          if (!map[rubKey].itemsMap[necKeyNormalized]) {
+            map[rubKey].itemsMap[necKeyNormalized] = {
+              label: necStr || "Atividade Planificada",
               quant: 0,
               valor: 0,
               count: 0,
             };
           }
-          map[targetLabel].itemsMap[itemKey].quant += qty;
-          map[targetLabel].itemsMap[itemKey].valor += val;
-          map[targetLabel].itemsMap[itemKey].count += 1;
+          map[rubKey].itemsMap[necKeyNormalized].quant += qty;
+          map[rubKey].itemsMap[necKeyNormalized].valor += val;
+          map[rubKey].itemsMap[necKeyNormalized].count += 1;
         }
       }
     });
@@ -1318,6 +1364,60 @@ export default function AcaoOrcamentalView({
       { quant: 0, valor: 0 }
     );
   }, [sistafePivotData]);
+
+  // Cálculo de Orçamento por Departamento (Total de Atividades)
+  const departmentTotals = useMemo(() => {
+    const totals: Record<string, number> = {};
+    
+    // Lista todos os departamentos conhecidos
+    Object.values(DEPARTAMENTOS).flat().forEach(dep => {
+      totals[dep] = 0;
+    });
+
+    // Soma o valor de cada atividade ao seu departamento correspondente
+    authorizedActivities.forEach(act => {
+      const dep = act.departamento || act.unidadeOrganica || "Sem Departamento";
+      if (!totals[dep]) totals[dep] = 0;
+
+      let actVal = 0;
+      if (Array.isArray(act.rubricas) && act.rubricas.length > 0) {
+        actVal = act.rubricas.reduce(
+          (acc: number, r: any) => acc + Number(r.valorTotal || r.total || r.valor || r.precoTotal || 0),
+          0
+        );
+      } else {
+        actVal = Number(act.valor || act.orcamentoTotal || act.valorTotal || act.orcamento || act.custoTotal || 0);
+      }
+      
+      totals[dep] += actVal;
+    });
+
+    return Object.entries(totals)
+      .map(([name, total]) => ({ name, total }))
+      .filter(item => item.total > 0)
+      .sort((a, b) => b.total - a.total);
+  }, [activities]);
+
+  // Mapeamento de Direções por Departamento
+  const direcaoByDepartamento = useMemo(() => {
+    const map: Record<string, string> = {};
+    Object.entries(DEPARTAMENTOS).forEach(([direcao, deps]) => {
+      deps.forEach(dep => { map[dep] = direcao; });
+    });
+    return map;
+  }, []);
+
+  // Cálculo de Orçamento por Direção (Soma de Departamentos)
+  const directionTotals = useMemo(() => {
+    const totals: Record<string, number> = {};
+    departmentTotals.forEach(dt => {
+      const dir = direcaoByDepartamento[dt.name] || "Gabinete / Outros";
+      totals[dir] = (totals[dir] || 0) + dt.total;
+    });
+    return Object.entries(totals)
+      .map(([name, total]) => ({ name, total }))
+      .sort((a, b) => b.total - a.total);
+  }, [departmentTotals, direcaoByDepartamento]);
 
   const toggleExpandPivotRow = (label: string) => {
     setExpandedPivotRows((prev) => ({ ...prev, [label]: !prev[label] }));
@@ -1359,8 +1459,8 @@ export default function AcaoOrcamentalView({
     user?.departamento?.toUpperCase().includes("DAF") ||
     title?.toUpperCase().includes("DAF");
 
-  // Teto Orçamental a nível da Instituição (Global)
-  const tetoInstitucional = 50000000; // 50M MZN Institucional
+  // Teto Orçamental a nível da Instituição (Global) - Dinâmico (Soma de todas as Direções)
+  const tetoInstitucional = directionTotals.reduce((acc, curr) => acc + curr.total, 0);
 
   const canEditTeto = useMemo(() => {
     const userDept = String(
@@ -1404,37 +1504,10 @@ export default function AcaoOrcamentalView({
   const [isEditingTeto, setIsEditingTeto] = useState(false);
   const [tempTetoInput, setTempTetoInput] = useState<string>("");
 
-  // Determinar o teto orçamental estático padrão por nível hierárquico
+  // Determinar o teto orçamental dinâmico padrão baseado nas atividades planificadas
   const defaultTeto = useMemo(() => {
-    // Se não existirem atividades registadas/orçamentadas para este setor/departamento, limpa o valor (0 MZN)
-    if (sectorActivities.length === 0) {
-      return 0;
-    }
-
-    const titleUpper = title.toUpperCase();
-    if (
-      titleUpper.includes("DIRETOR GERAL") ||
-      titleUpper.includes("GABINETE") ||
-      titleUpper.includes("DPEP") ||
-      titleUpper.includes("CONSELHO")
-    ) {
-      return 15000000; // 15M MZN
-    } else if (
-      titleUpper.includes("DIREÇÃO") ||
-      titleUpper.includes("DIVISÃO") ||
-      titleUpper.includes("DICOSAFA") ||
-      titleUpper.includes("DICOSSER")
-    ) {
-      return 5000000; // 5M MZN
-    } else if (
-      titleUpper.includes("DEPARTAMENTO") ||
-      titleUpper.includes("UNIDADE")
-    ) {
-      return 1500000; // 1.5M MZN
-    } else {
-      return 500000; // 500k MZN (Repartições / Setores)
-    }
-  }, [title, sectorActivities.length]);
+    return totalOrcamentadoSetor;
+  }, [totalOrcamentadoSetor]);
 
   const tetoMax = sectorActivities.length === 0 ? 0 : (customTeto > 0 ? customTeto : defaultTeto);
 
@@ -1628,9 +1701,20 @@ export default function AcaoOrcamentalView({
   };
 
   return (
-    <div className="w-full space-y-6 pb-12 animate-fade-in max-w-7xl mx-auto">
-      {/* Header */}
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center border-b border-slate-100 pb-4 gap-4">
+    <div id="acao-orcamental-print-area" className="w-full space-y-6 pb-12 animate-fade-in max-w-7xl mx-auto">
+      <InstitutionalHeader
+        direcaoName={user?.direcao || user?.unidadeOrganica || "Direção"}
+        departamentoName={user?.departamento || ""}
+        reparticaoName={user?.reparticao || ""}
+        sectorName={user?.setor || user?.cargo || ""}
+        year={2027}
+        isOwner={user?.isOwner}
+        unidadeName={user?.unidade || user?.unidadeOrganica || "Unidade Orgânica"}
+        title="AÇÃO ORÇAMENTAL & DISTRIBUIÇÃO DE NECESSIDADES"
+      />
+
+      {/* Header controls */}
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center border-b border-slate-100 pb-4 gap-4 px-4">
         <div className="flex items-center gap-3">
           {onBack && (
             <button
@@ -1688,529 +1772,151 @@ export default function AcaoOrcamentalView({
       {/* Overview Tab */}
       {activeTab === "overview" && (
         <div className="space-y-6">
-          {/* Institutional Budget Ceiling Banner */}
-          <div className="bg-slate-900 text-white p-6 rounded-3xl flex flex-col md:flex-row justify-between items-start md:items-center gap-4 shadow-xl">
-            <div className="space-y-1">
-              <div className="flex items-center gap-2">
-                <span className="px-2.5 py-0.5 bg-blue-600 text-white text-[9px] font-black uppercase tracking-widest rounded-md">
-                  Nível Institucional
-                </span>
-                <span className="text-xs font-bold text-slate-400">
-                  Diretrizes Orçamentais do ISPS
-                </span>
-              </div>
-              <h3 className="text-xl font-black text-white tracking-tight">
-                Teto Orçamental Geral da Instituição
-              </h3>
-              <p className="text-xs text-slate-300">
-                Dotação orçamental máxima consolidada a nível institucional.
-              </p>
-            </div>
-            <div className="text-right bg-white/10 px-6 py-3 rounded-2xl border border-white/10">
-              <p className="text-[10px] font-black text-amber-400 uppercase tracking-widest">
-                Teto Institucional
-              </p>
-              <p className="text-2xl font-black font-mono text-white">
-                {tetoInstitucional.toLocaleString()} MZN
-              </p>
-            </div>
-          </div>
-
-          {/* KPIs */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 justify-items-center">
-            <div className="bg-gradient-to-br from-blue-50/50 to-blue-50/10 p-6 rounded-3xl border border-blue-100 shadow-sm flex flex-col justify-between">
-              <div>
-                <div className="flex justify-between items-start mb-4">
-                  <div>
-                    <p className="text-[10px] font-black text-blue-500 uppercase tracking-widest">
-                      Teto Atribuído (Setor / Direção)
-                    </p>
-                    <p className="text-2xl font-black font-mono text-slate-900 mt-1">
-                      {tetoMax.toLocaleString()} MZN
-                    </p>
-                  </div>
-                  <div className="w-10 h-10 bg-blue-100 rounded-xl flex items-center justify-center text-blue-600">
-                    <Coins size={20} />
-                  </div>
+          {/* Hierarquia Orçamental (Novo Requisito) */}
+          {(isPlanificacaoOrDPEP || isSuperBossUser(user)) && selectedLevel === "institucional" && (
+            <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm space-y-4">
+              <div className="flex items-center gap-2 mb-2">
+                <div className="p-2 bg-indigo-100 text-indigo-600 rounded-lg">
+                  <PieChart size={20} />
                 </div>
-                <p className="text-[11px] text-slate-500 leading-normal mb-4">
-                  Limite orçamental atribuído a este setor / direção para o
-                  exercício atual.
-                </p>
-              </div>
-              {canEditTeto && (
-                <div className="pt-3 border-t border-blue-100">
-                  {!isEditingTeto ? (
-                    <button
-                      onClick={() => {
-                        setTempTetoInput(String(tetoMax));
-                        setIsEditingTeto(true);
-                      }}
-                      className="w-full py-2 bg-blue-600 hover:bg-blue-700 text-white font-black text-[10px] uppercase tracking-widest rounded-xl transition-colors shadow-sm"
-                    >
-                      Inserir / Alterar Teto Atribuído
-                    </button>
-                  ) : (
-                    <div className="space-y-3 bg-white p-3 rounded-2xl border border-blue-200">
-                      <div>
-                        <label className="text-[9px] font-black text-slate-600 uppercase tracking-wider block mb-1">
-                          Novo Teto Atribuído (MZN):
-                        </label>
-                        <input
-                          type="number"
-                          value={tempTetoInput}
-                          onChange={(e) => setTempTetoInput(e.target.value)}
-                          placeholder="Ex: 2500000"
-                          className="w-full p-2.5 text-xs font-bold border rounded-xl outline-none focus:border-blue-600 font-mono"
-                        />
-                      </div>
-                      <div className="flex gap-2">
-                        <button
-                          onClick={handleSaveTeto}
-                          className="flex-1 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-black text-[10px] uppercase tracking-widest rounded-xl transition-colors"
-                        >
-                          Salvar
-                        </button>
-                        <button
-                          onClick={() => setIsEditingTeto(false)}
-                          className="px-3 py-2 bg-slate-200 hover:bg-slate-300 text-slate-700 font-black text-[10px] uppercase tracking-widest rounded-xl transition-colors"
-                        >
-                          Cancelar
-                        </button>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
-
-            <div className="bg-gradient-to-br from-amber-50/50 to-amber-50/10 p-6 rounded-3xl border border-amber-100 shadow-sm flex flex-col justify-between">
-              <div className="flex justify-between items-start mb-4">
                 <div>
-                  <p className="text-[10px] font-black text-amber-500 uppercase tracking-widest">
-                    Despesa Planificada
-                  </p>
-                  <p className="text-2xl font-black font-mono text-slate-900 mt-1">
-                    {totalDespesaPlanificada.toLocaleString()} MZN
-                  </p>
-                </div>
-                <div className="w-10 h-10 bg-amber-100 rounded-xl flex items-center justify-center text-amber-600">
-                  <TrendingDown size={20} />
+                  <h3 className="text-sm font-black text-slate-900 uppercase tracking-wider">Monitoria Hierárquica Orçamental</h3>
+                  <p className="text-[10px] text-slate-500 font-medium">Visualização por níveis e unidades organizacionais</p>
                 </div>
               </div>
-              <div className="w-full bg-slate-100 rounded-full h-2 mt-1 overflow-hidden">
-                <div
-                  className={`h-full rounded-full ${percentagemExecucao > 90 ? "bg-rose-500" : "bg-amber-500"}`}
-                  style={{ width: `${Math.min(percentagemExecucao, 100)}%` }}
-                ></div>
-              </div>
-              <p className="text-[10px] font-bold text-slate-500 mt-2 text-right">
-                {percentagemExecucao.toFixed(1)}% do Teto Utilizado
-              </p>
-            </div>
 
-            <div
-              className={`p-6 rounded-3xl border shadow-sm flex flex-col justify-between ${
-                saldoDisponivel >= 0
-                  ? "bg-gradient-to-br from-emerald-50/50 to-emerald-50/10 border-emerald-100"
-                  : "bg-gradient-to-br from-rose-50/50 to-rose-50/10 border-rose-100"
-              }`}
-            >
-              <div className="flex justify-between items-start mb-4">
-                <div>
-                  <p
-                    className={`text-[10px] font-black uppercase tracking-widest ${
-                      saldoDisponivel >= 0
-                        ? "text-emerald-500"
-                        : "text-rose-500"
-                    }`}
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                <div className="space-y-1.5">
+                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">Nível de Visualização</label>
+                  <select 
+                    value={selectedLevel}
+                    onChange={(e) => {
+                      setSelectedLevel(e.target.value as any);
+                      setSelectedUnit("todos");
+                    }}
+                    className="w-full bg-slate-50 border border-slate-200 rounded-xl p-2.5 text-xs font-bold text-slate-700 focus:ring-2 focus:ring-indigo-500/20 transition-all cursor-pointer"
                   >
-                    Saldo Disponível
-                  </p>
-                  <p
-                    className={`text-2xl font-black font-mono mt-1 ${
-                      saldoDisponivel >= 0
-                        ? "text-emerald-700"
-                        : "text-rose-700"
-                    }`}
-                  >
-                    {saldoDisponivel.toLocaleString()} MZN
-                  </p>
-                </div>
-                <div
-                  className={`w-10 h-10 rounded-xl flex items-center justify-center ${
-                    saldoDisponivel >= 0
-                      ? "bg-emerald-100 text-emerald-600"
-                      : "bg-rose-100 text-rose-600"
-                  }`}
-                >
-                  <TrendingUp size={20} />
-                </div>
-              </div>
-              <p className="text-[11px] text-slate-500 leading-normal">
-                {saldoDisponivel >= 0
-                  ? "Crédito orçamental remanescente para o registo de novas actividades."
-                  : "Atenção: A planificação excede o limite estipulado. Reduza custos ou solicite reforço."}
-              </p>
-            </div>
-          </div>
-
-          {/* Gráfico de Fontes de Financiamento */}
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            <div className="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm lg:col-span-2">
-              <h3 className="text-sm font-black text-slate-900 uppercase tracking-widest mb-4 flex items-center gap-2">
-                <PieChart size={16} className="text-slate-500" /> Fontes de
-                Financiamento Utilizadas
-              </h3>
-              <div className="space-y-4">
-                <div>
-                  <div className="flex justify-between text-xs font-bold text-slate-600 mb-1">
-                    <span>Orçamento Geral do Estado (OE)</span>
-                    <span className="font-mono">
-                      {despesaPorFonte.oe.toLocaleString()} MZN
-                    </span>
-                  </div>
-                  <div className="w-full bg-slate-50 rounded-full h-3">
-                    <div
-                      className="bg-blue-600 h-full rounded-full"
-                      style={{
-                        width: `${totalDespesaPlanificada > 0 ? (despesaPorFonte.oe / totalDespesaPlanificada) * 100 : 0}%`,
-                      }}
-                    ></div>
-                  </div>
-                </div>
-
-                <div>
-                  <div className="flex justify-between text-xs font-bold text-slate-600 mb-1">
-                    <span>Receitas Próprias (RP)</span>
-                    <span className="font-mono">
-                      {despesaPorFonte.rp.toLocaleString()} MZN
-                    </span>
-                  </div>
-                  <div className="w-full bg-slate-50 rounded-full h-3">
-                    <div
-                      className="bg-emerald-500 h-full rounded-full"
-                      style={{
-                        width: `${totalDespesaPlanificada > 0 ? (despesaPorFonte.rp / totalDespesaPlanificada) * 100 : 0}%`,
-                      }}
-                    ></div>
-                  </div>
-                </div>
-
-                <div>
-                  <div className="flex justify-between text-xs font-bold text-slate-600 mb-1">
-                    <span>Outras Fontes (Doadores / Fundos Externos)</span>
-                    <span className="font-mono">
-                      {despesaPorFonte.outros.toLocaleString()} MZN
-                    </span>
-                  </div>
-                  <div className="w-full bg-slate-50 rounded-full h-3">
-                    <div
-                      className="bg-amber-400 h-full rounded-full"
-                      style={{
-                        width: `${totalDespesaPlanificada > 0 ? (despesaPorFonte.outros / totalDespesaPlanificada) * 100 : 0}%`,
-                      }}
-                    ></div>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <div className="bg-slate-900 text-white p-6 rounded-3xl border border-slate-800 shadow-xl flex flex-col justify-between">
-              <div>
-                <h4 className="text-xs font-black tracking-widest text-amber-400 uppercase mb-3">
-                  Auditoria Interna DPEP
-                </h4>
-                <p className="text-xl font-bold tracking-tight mb-2 leading-snug">
-                  Conformidade Orçamental do Setor
-                </p>
-                <div className="mt-4 flex items-start gap-2.5 bg-white/5 border border-white/10 rounded-2xl p-3.5">
-                  <AlertCircle
-                    size={18}
-                    className="text-amber-400 shrink-0 mt-0.5"
-                  />
-                  <p className="text-[11px] text-slate-300 leading-normal">
-                    {saldoDisponivel >= 0
-                      ? "O seu setor está em conformidade com as diretrizes da DAF e DPEP. O saldo atual é positivo."
-                      : "Défice detetado. Por favor, reajuste os valores das actividades orçamentadas ou use o formulário de reforço."}
-                  </p>
-                </div>
-              </div>
-              <div className="text-[10px] text-slate-400 mt-6 pt-4 border-t border-white/10 font-bold uppercase tracking-wider">
-                Última sincronização: Hoje
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Rúbricas Tab */}
-      {activeTab === "rubricas" && (
-        <div className="space-y-6">
-          {/* Seletor Nível Organizacional e Unidade para visualização e impressão */}
-          <div className="bg-slate-50 p-6 rounded-3xl border border-slate-200/60 shadow-sm space-y-4">
-            <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4">
-              <div className="flex-1">
-                <h3 className="text-sm font-black text-slate-900 uppercase tracking-widest flex items-center gap-2">
-                  📂 Ação Orçamental & Distribuição de Necessidades
-                </h3>
-                <p className="text-xs text-slate-500 mt-1">
-                  Selecione o nível e unidade organizacional para visualizar o orçamento geral e necessidades de consumo.
-                </p>
-              </div>
-
-              <button
-                onClick={() =>
-                  printElementById(
-                    "acao-orcamental-print-area",
-                    `Acao_Orcamental_${selectedLevel}_${selectedUnit.replace(/\s+/g, "_")}`,
-                  )
-                }
-                className="bg-[#7c3aed] hover:bg-[#6d28d9] text-white font-black tracking-wider text-xs uppercase px-5 py-2.5 rounded-xl transition-all flex items-center justify-center gap-2 shadow-lg shadow-purple-100/50 cursor-pointer h-[42px] shrink-0"
-              >
-                <Printer size={15} strokeWidth={2.5} /> Imprimir Relatório
-              </button>
-            </div>
-
-            {/* Barra de Seleção de Nível Estrutural */}
-            <div className="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3 pt-3 border-t border-slate-200/60">
-              <div className="flex items-center gap-1.5 overflow-x-auto pb-1 max-w-full custom-scrollbar">
-                <span className="text-xs font-extrabold text-slate-500 uppercase tracking-wider mr-2 shrink-0">
-                  Nível:
-                </span>
-
-                {isPlanificacaoOrDPEP ? (
-                  <>
-                    <button
-                      onClick={() => handleLevelChange("institucional")}
-                      className={`px-3.5 py-2 rounded-xl text-xs font-black transition-all cursor-pointer whitespace-nowrap shrink-0 ${
-                        selectedLevel === "institucional"
-                          ? "bg-slate-900 text-white shadow-md"
-                          : "bg-white text-slate-700 hover:bg-slate-200/70 border border-slate-200"
-                      }`}
-                    >
-                      🏛️ Institucional (Geral)
-                    </button>
-
-                    <button
-                      onClick={() => handleLevelChange("direcao")}
-                      className={`px-3.5 py-2 rounded-xl text-xs font-black transition-all cursor-pointer whitespace-nowrap shrink-0 ${
-                        selectedLevel === "direcao"
-                          ? "bg-sky-700 text-white shadow-md"
-                          : "bg-white text-slate-700 hover:bg-slate-200/70 border border-slate-200"
-                      }`}
-                    >
-                      🏢 Por Direção
-                    </button>
-
-                    <button
-                      onClick={() => handleLevelChange("departamento")}
-                      className={`px-3.5 py-2 rounded-xl text-xs font-black transition-all cursor-pointer whitespace-nowrap shrink-0 ${
-                        selectedLevel === "departamento"
-                          ? "bg-sky-700 text-white shadow-md"
-                          : "bg-white text-slate-700 hover:bg-slate-200/70 border border-slate-200"
-                      }`}
-                    >
-                      📂 Por Departamento
-                    </button>
-
-                    <button
-                      onClick={() => handleLevelChange("reparticao")}
-                      className={`px-3.5 py-2 rounded-xl text-xs font-black transition-all cursor-pointer whitespace-nowrap shrink-0 ${
-                        selectedLevel === "reparticao"
-                          ? "bg-sky-700 text-white shadow-md"
-                          : "bg-white text-slate-700 hover:bg-slate-200/70 border border-slate-200"
-                      }`}
-                    >
-                      📍 Por Repartição
-                    </button>
-
-                    <button
-                      onClick={() => handleLevelChange("setor")}
-                      className={`px-3.5 py-2 rounded-xl text-xs font-black transition-all cursor-pointer whitespace-nowrap shrink-0 ${
-                        selectedLevel === "setor"
-                          ? "bg-sky-700 text-white shadow-md"
-                          : "bg-white text-slate-700 hover:bg-slate-200/70 border border-slate-200"
-                      }`}
-                    >
-                      📌 Por Setor
-                    </button>
-                  </>
-                ) : (
-                  <>
-                    <button
-                      onClick={() => {
-                        setSelectedLevel("direcao");
-                        setSelectedUnit(userDirecao);
-                      }}
-                      className={`px-3.5 py-2 rounded-xl text-xs font-black transition-all cursor-pointer whitespace-nowrap shrink-0 ${
-                        selectedLevel === "direcao"
-                          ? "bg-sky-700 text-white shadow-md"
-                          : "bg-white text-slate-700 hover:bg-slate-200/70 border border-slate-200"
-                      }`}
-                    >
-                      🏢 Por Direção: {userDirecao}
-                    </button>
-
-                    <button
-                      onClick={() => {
-                        setSelectedLevel("departamento");
-                        setSelectedUnit(userDepartamento);
-                      }}
-                      className={`px-3.5 py-2 rounded-xl text-xs font-black transition-all cursor-pointer whitespace-nowrap shrink-0 ${
-                        selectedLevel === "departamento"
-                          ? "bg-sky-700 text-white shadow-md"
-                          : "bg-white text-slate-700 hover:bg-slate-200/70 border border-slate-200"
-                      }`}
-                    >
-                      📂 Por Departamento: {userDepartamento}
-                    </button>
-                  </>
-                )}
-              </div>
-
-              {/* Seletor da Unidade Conforme o Nível Escolhido */}
-              {selectedLevel !== "institucional" && (isPlanificacaoOrDPEP || selectedLevel === "departamento" || (DEPARTAMENTOS[userDirecao] || []).length > 1) && (
-                <div className="flex items-center gap-2 w-full md:w-auto">
-                  <label className="text-xs font-bold text-slate-600 whitespace-nowrap">
-                    {selectedLevel === "direcao" ? "Por Direção:" : "Departamento:"}
-                  </label>
-                  <select
-                    value={selectedUnit}
-                    onChange={(e) => setSelectedUnit(e.target.value)}
-                    className="w-full md:w-64 bg-white border border-slate-300 rounded-xl px-4 py-2 text-xs font-black text-slate-800 focus:outline-none focus:ring-2 focus:ring-sky-500 transition-all cursor-pointer shadow-xs"
-                  >
-                    {isPlanificacaoOrDPEP && (
-                      <option value="todos">
-                        {selectedLevel === "direcao" ? "Todas as Direções" : `Todas as Unidades (${selectedLevel.toUpperCase()})`}
-                      </option>
-                    )}
-                    {isPlanificacaoOrDPEP ? (
-                      (levelUnits[selectedLevel] || []).map((unit, idx) => (
-                        <option key={idx} value={unit}>
-                          {unit}
-                        </option>
-                      ))
-                    ) : selectedLevel === "direcao" ? (
-                      <option value={userDirecao}>{userDirecao}</option>
-                    ) : (
-                      <>
-                        <option value={userDepartamento}>{userDepartamento}</option>
-                        {DEPARTAMENTOS[userDirecao]?.map((dep, idx) => (
-                          <option key={idx} value={dep}>{dep}</option>
-                        ))}
-                      </>
-                    )}
+                    <option value="institucional">Institucional (Geral)</option>
+                    <option value="direcao">Por Direção</option>
+                    <option value="departamento">Por Departamento</option>
+                    <option value="reparticao">Por Repartição</option>
+                    <option value="setor">Por Setor</option>
                   </select>
                 </div>
-              )}
-            </div>
-          </div>
 
-          {/* Cards de Métricas Resumo do Orçamento Geral */}
-          {sectorActivities.length > 0 ? (
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-            <div className="bg-gradient-to-br from-slate-900 to-slate-800 text-white p-5 rounded-2xl shadow-sm border border-slate-700">
-              <span className="text-[10px] font-black uppercase tracking-widest text-sky-400 block mb-1">
-                Orçamento Geral Calculado (Atividades)
-              </span>
-              <div className="text-2xl font-black font-mono text-white">
-                {Math.max(
-                  totalOrcamentadoSetor,
-                  rubricasBreakdown.reduce((acc, curr) => acc + curr.totalValorRubrica, 0)
-                ).toLocaleString("pt-MZ", {
-                  minimumFractionDigits: 2,
-                  maximumFractionDigits: 2,
-                })}{" "}
-                <span className="text-xs text-slate-300 font-sans">MZN</span>
+                <div className="space-y-1.5">
+                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">Unidade / Responsável</label>
+                  <select 
+                    value={selectedUnit}
+                    onChange={(e) => setSelectedUnit(e.target.value)}
+                    className="w-full bg-slate-50 border border-slate-200 rounded-xl p-2.5 text-xs font-bold text-slate-700 focus:ring-2 focus:ring-indigo-500/20 transition-all cursor-pointer"
+                  >
+                    <option value="todos">Todos ({selectedLevel === "institucional" ? "Geral" : "da categoria"})</option>
+                    {selectedLevel === "direcao" && levelUnits.direcao.map(u => <option key={u} value={u}>{u}</option>)}
+                    {selectedLevel === "departamento" && levelUnits.departamento.map(u => <option key={u} value={u}>{u}</option>)}
+                    {selectedLevel === "reparticao" && levelUnits.reparticao.map(u => <option key={u} value={u}>{u}</option>)}
+                    {selectedLevel === "setor" && levelUnits.setor.map(u => <option key={u} value={u}>{u}</option>)}
+                  </select>
+                </div>
               </div>
-              <span className="text-[10px] text-slate-400 block mt-1">
-                Nível: {selectedLevel.toUpperCase()} {selectedUnit !== "todos" ? `• ${selectedUnit}` : ""}
-              </span>
-            </div>
-
-            <div className="bg-white p-5 rounded-2xl shadow-sm border border-slate-200">
-              <span className="text-[10px] font-black uppercase tracking-widest text-slate-400 block mb-1">
-                Rúbricas Ativas
-              </span>
-              <div className="text-2xl font-black font-mono text-slate-800">
-                {rubricasBreakdown.length}{" "}
-                <span className="text-xs text-slate-400 font-sans">Rúbricas</span>
-              </div>
-              <span className="text-[10px] text-slate-500 block mt-1">
-                {sectorActivities.length} Atividades Planificadas
-              </span>
-            </div>
-
-            <div className="bg-white p-5 rounded-2xl shadow-sm border border-slate-200">
-              <span className="text-[10px] font-black uppercase tracking-widest text-slate-400 block mb-1">
-                Necessidades Mapeadas
-              </span>
-              <div className="text-2xl font-black font-mono text-slate-800">
-                {rubricasBreakdown.reduce((acc, curr) => acc + curr.necessidadesList.length, 0)}{" "}
-                <span className="text-xs text-slate-400 font-sans">Necessidades</span>
-              </div>
-              <span className="text-[10px] text-slate-500 block mt-1">
-                Especificadas em Rúbrica
-              </span>
-            </div>
-            </div>
-          ) : (
-            <div className="bg-white p-16 rounded-3xl border-2 border-dashed border-slate-200 text-center">
-              <div className="bg-slate-50 w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-6">
-                <Coins className="text-slate-300" size={40} />
-              </div>
-              <h3 className="text-xl font-black text-slate-900 tracking-tight">Sem Plano Orçamental Registado</h3>
-              <p className="text-slate-500 text-sm max-w-md mx-auto mt-2 leading-relaxed">
-                Não foram encontradas atividades planificadas para o nível estrutural 
-                <strong className="text-slate-900 font-black px-1.5">
-                  {selectedLevel.toUpperCase()}
-                </strong> 
-                {selectedUnit !== "todos" && (
-                  <>
-                    na unidade <strong className="text-slate-900 font-black px-1.5">{selectedUnit}</strong>
-                  </>
-                )}
-                . O orçamento só é gerado após a inserção de atividades e rúbricas na matriz.
-              </p>
             </div>
           )}
 
-          {/* Resumo Executivo Rápido por Categoria / Rúbrica */}
-          {sectorActivities.length > 0 && (
-            <div className="bg-sky-900/5 border border-sky-200/80 p-5 rounded-3xl space-y-3">
-            <div className="flex items-center justify-between">
-              <h4 className="text-xs font-black uppercase tracking-widest text-sky-900 flex items-center gap-2">
-                💡 Resumo Consolidado por Rúbrica (Materiais, Serviços, Ajudas de Custo)
-              </h4>
-              <span className="text-[10px] font-bold text-sky-700 bg-sky-100 px-2.5 py-1 rounded-full">
-                {parentRubricasBreakdown.length} Rúbricas Mães Mapeadas
-              </span>
+          {/* Metrics Cards */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+            <div className="bg-white p-5 rounded-3xl border border-slate-200 shadow-sm hover:shadow-md transition-all group">
+              <div className="flex justify-between items-start mb-4">
+                <div className="p-2.5 bg-sky-50 text-sky-600 rounded-2xl group-hover:bg-sky-600 group-hover:text-white transition-colors">
+                  <DollarSign size={20} />
+                </div>
+                <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest bg-slate-50 px-2 py-0.5 rounded-lg">Orçamento</div>
+              </div>
+              <div className="space-y-1">
+                <div className="text-2xl font-black text-slate-900 font-mono tracking-tighter">
+                  {totalOrcamentadoSetor.toLocaleString("pt-MZ", { minimumFractionDigits: 2 })}
+                </div>
+                <div className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Total Planeado (MZN)</div>
+              </div>
             </div>
 
-            {parentRubricasBreakdown.length > 0 ? (
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+            <div className="bg-white p-5 rounded-3xl border border-slate-200 shadow-sm hover:shadow-md transition-all group">
+              <div className="flex justify-between items-start mb-4">
+                <div className="p-2.5 bg-amber-50 text-amber-600 rounded-2xl group-hover:bg-amber-600 group-hover:text-white transition-colors">
+                  <LayoutGrid size={20} />
+                </div>
+                <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest bg-slate-50 px-2 py-0.5 rounded-lg">Rúbricas</div>
+              </div>
+              <div className="space-y-1">
+                <div className="text-2xl font-black text-slate-900 font-mono tracking-tighter">
+                  {parentRubricasBreakdown.length}
+                </div>
+                <div className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Categorias Sistafé</div>
+              </div>
+            </div>
+
+            <div className="bg-white p-5 rounded-3xl border border-slate-200 shadow-sm hover:shadow-md transition-all group">
+              <div className="flex justify-between items-start mb-4">
+                <div className="p-2.5 bg-indigo-50 text-indigo-600 rounded-2xl group-hover:bg-indigo-600 group-hover:text-white transition-colors">
+                  <TrendingUp size={20} />
+                </div>
+                <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest bg-slate-50 px-2 py-0.5 rounded-lg">Atividades</div>
+              </div>
+              <div className="space-y-1">
+                <div className="text-2xl font-black text-slate-900 font-mono tracking-tighter">
+                  {sectorActivities.length}
+                </div>
+                <div className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Ações Mapeadas</div>
+              </div>
+            </div>
+
+            <div className="bg-white p-5 rounded-3xl border border-slate-200 shadow-sm hover:shadow-md transition-all group">
+              <div className="flex justify-between items-start mb-4">
+                <div className="p-2.5 bg-emerald-50 text-emerald-600 rounded-2xl group-hover:bg-emerald-600 group-hover:text-white transition-colors">
+                  <CheckCircle2 size={20} />
+                </div>
+                <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest bg-slate-50 px-2 py-0.5 rounded-lg">Produtos</div>
+              </div>
+              <div className="space-y-1">
+                <div className="text-2xl font-black text-slate-900 font-mono tracking-tighter">
+                  {parentRubricasBreakdown.reduce((acc, curr) => acc + curr.itemsCount, 0)}
+                </div>
+                <div className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Necessidades/Itens</div>
+              </div>
+            </div>
+          </div>
+
+          {/* Consolidado por Rúbrica */}
+          {sectorActivities.length > 0 && (
+            <div className="bg-sky-900/5 border border-sky-200/80 p-6 rounded-3xl space-y-5">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h4 className="text-sm font-black uppercase tracking-widest text-sky-900 flex items-center gap-2">
+                    💡 Resumo Consolidado por Rúbrica Mãe
+                  </h4>
+                  <p className="text-[10px] text-sky-700 font-medium mt-1">Agrupamento estratégico para gestão de dotações</p>
+                </div>
+                <span className="text-[10px] font-bold text-sky-700 bg-sky-100 px-3 py-1.5 rounded-full border border-sky-200">
+                  {parentRubricasBreakdown.length} Rúbricas Mapeadas
+                </span>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                 {parentRubricasBreakdown.map((rub, idx) => {
-                  const grandTotal = Math.max(
-                    totalOrcamentadoSetor,
-                    parentRubricasBreakdown.reduce((acc, curr) => acc + curr.totalValor, 0)
-                  );
-                  const pct = grandTotal > 0 ? (rub.totalValor / grandTotal) * 100 : 0;
                   const isMaterial = rub.parentName.toLowerCase().includes("bens") || rub.parentName.toLowerCase().includes("material");
                   const isServicos = rub.parentName.toLowerCase().includes("serviços");
                   const isAjudas = rub.parentName.toLowerCase().includes("ajuda");
+                  
+                  const grandTotal = Math.max(totalOrcamentadoSetor, parentRubricasBreakdown.reduce((acc, curr) => acc + curr.totalValor, 0));
+                  const pct = grandTotal > 0 ? (rub.totalValor / grandTotal) * 100 : 0;
 
                   return (
-                    <div
-                      key={idx}
-                      className={`p-4 rounded-2xl border transition-all ${
-                        isMaterial
-                          ? "bg-amber-500/10 border-amber-300 ring-1 ring-amber-400/20"
-                          : isServicos
-                          ? "bg-blue-500/10 border-blue-300 ring-1 ring-blue-400/20"
-                          : isAjudas
-                          ? "bg-emerald-500/10 border-emerald-300 ring-1 ring-emerald-400/20"
-                          : "bg-white border-slate-200"
+                    <div 
+                      key={idx} 
+                      className={`p-5 rounded-2xl border transition-all shadow-sm ${
+                        isMaterial ? "bg-amber-500/10 border-amber-300 ring-1 ring-amber-400/20" :
+                        isServicos ? "bg-blue-500/10 border-blue-300 ring-1 ring-blue-400/20" :
+                        isAjudas ? "bg-emerald-500/10 border-emerald-300 ring-1 ring-emerald-400/20" :
+                        "bg-white border-slate-200"
                       }`}
                     >
                       <div className="text-[11px] font-black uppercase tracking-wider text-slate-700 truncate mb-1">
@@ -2218,30 +1924,25 @@ export default function AcaoOrcamentalView({
                         {rub.parentName}
                       </div>
                       <div className="text-lg font-black font-mono text-slate-900">
-                        {rub.totalValor.toLocaleString("pt-MZ", {
-                          minimumFractionDigits: 2,
-                          maximumFractionDigits: 2,
-                        })}{" "}
-                        <span className="text-[10px] font-sans font-normal text-slate-500">MZN</span>
+                        {rub.totalValor.toLocaleString("pt-MZ", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} <span className="text-[10px] font-sans font-normal text-slate-500">MZN</span>
                       </div>
-                      <div className="flex justify-between items-center text-[10px] text-slate-500 mt-2 pt-2 border-t border-slate-100 font-medium">
-                        <span>{rub.itemsCount} rubricas/atividades</span>
+                      <div className="flex justify-between items-center text-[10px] text-slate-500 mt-3 pt-3 border-t border-slate-100 font-medium">
+                        <span>{rub.itemsCount} rúbricas e atividades</span>
                         <span className="font-bold text-sky-800">{pct.toFixed(1)}% do total</span>
                       </div>
                     </div>
                   );
                 })}
               </div>
-            ) : (
-              <p className="text-xs text-slate-500 italic text-center py-2">
-                Nenhuma rúbrica ou valor cadastrado para este nível.
-              </p>
-            )}
             </div>
           )}
+        </div>
+      )}
 
+  {activeTab === "rubricas" && (
+        <div className="space-y-6">
           {/* Seção Principal de Resumo Tabela Dinâmica SISTAFE (Matriz Orçamental) */}
-          {sectorActivities.length > 0 && (
+          {sectorActivities.length > 0 ? (
             <>
             <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm space-y-6">
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 border-b border-slate-100 pb-4">
@@ -2287,18 +1988,24 @@ export default function AcaoOrcamentalView({
             <div className="overflow-x-auto overflow-y-auto max-h-[600px] border border-slate-300 rounded-xl shadow-xs">
               <table className="w-full text-left text-xs border-collapse font-sans">
                 <thead>
-                  <tr className="bg-slate-200 text-slate-900 border-b-2 border-slate-400 font-black">
-                    <th className="p-3 border border-slate-300 w-[50%]">
-                      <div className="flex items-center gap-1">
-                        <span>Rubrica e Necessidade / Produto X</span>
-                        <span className="text-[10px] text-slate-500 font-normal ml-1">▼</span>
-                      </div>
+                  <tr className="bg-blue-900 text-white text-[10px] tracking-wider">
+                    <th className="p-4 font-black border-r border-blue-800">
+                      N/O
                     </th>
-                    <th className="p-3 text-center border border-slate-300 w-[20%] font-mono">
-                      Qtd Total Planificada
+                    <th className="p-4 font-black border-r border-blue-800">
+                      NOME DA RUBRICA
                     </th>
-                    <th className="p-3 text-right border border-slate-300 w-[30%] font-mono">
-                      Valor Total (MZN)
+                    <th className="p-4 font-black border-r border-blue-800">
+                      NOME DA NECESSIDADE
+                    </th>
+                    <th className="p-4 font-black border-r border-blue-800">
+                      NOME DO PRODUTO/SERVICO
+                    </th>
+                    <th className="p-4 font-black border-r border-blue-800">
+                      QUANTIDADE
+                    </th>
+                    <th className="p-4 font-black border-r border-blue-800">
+                      VALOR TOTAL
                     </th>
                   </tr>
                 </thead>
@@ -2312,7 +2019,7 @@ export default function AcaoOrcamentalView({
                     if (filteredRows.length === 0) {
                       return (
                         <tr>
-                          <td colSpan={3} className="p-8 text-center text-slate-400 italic">
+                          <td colSpan={6} className="p-8 text-center text-slate-400 italic">
                             Nenhum dado encontrado para o filtro selecionado.
                           </td>
                         </tr>
@@ -2327,7 +2034,10 @@ export default function AcaoOrcamentalView({
                         <React.Fragment key={idx}>
                           {/* Linha da Rúbrica */}
                           <tr className={`border-b border-slate-200 hover:bg-slate-50 transition-colors ${row.totalValor > 0 ? "font-bold text-slate-900" : "text-slate-500"}`}>
-                            <td className="p-2.5 border border-slate-200">
+                            <td className="p-3 border border-slate-200 font-mono text-xs">
+                              {String(idx + 1).padStart(2, "0")}
+                            </td>
+                            <td className="p-3 border border-slate-200 font-bold">
                               <div className="flex items-center gap-2">
                                 <button
                                   type="button"
@@ -2336,19 +2046,25 @@ export default function AcaoOrcamentalView({
                                 >
                                   {isExpanded ? "−" : "+"}
                                 </button>
-                                <span className="font-bold">{row.label}</span>
+                                <span>{row.label}</span>
                               </div>
                             </td>
-                            <td className="p-2.5 text-center border border-slate-200 font-mono font-bold text-blue-900">
+                            <td className="p-3 border border-slate-200 text-slate-600">
+                              —
+                            </td>
+                            <td className="p-3 border border-slate-200 text-slate-600">
+                              —
+                            </td>
+                            <td className="p-3 text-center border border-slate-200 font-mono font-bold text-blue-900">
                               {row.totalQuant > 0 ? row.totalQuant.toLocaleString("pt-MZ") : "—"}
                             </td>
-                            <td className="p-2.5 text-right border border-slate-200 font-mono font-bold">
+                            <td className="p-3 text-right border border-slate-200 font-mono font-bold text-blue-950">
                               {row.totalValor > 0
                                 ? row.totalValor.toLocaleString("pt-MZ", {
                                     minimumFractionDigits: 2,
                                     maximumFractionDigits: 2,
-                                  })
-                                : "0,00"}
+                                  }) + " MZN"
+                                : "0,00 MZN"}
                             </td>
                           </tr>
 
@@ -2356,35 +2072,27 @@ export default function AcaoOrcamentalView({
                           {isExpanded && hasItems &&
                             Object.values(row.itemsMap).map((item: any, iIdx) => (
                               <tr key={iIdx} className="border-b border-slate-100 bg-slate-50/70 text-slate-700">
-                                <td className="p-2.5 pl-9 border border-slate-200 font-medium text-slate-700">
-                                  <div className="flex flex-col gap-1">
-                                    <div className="flex items-center gap-2 flex-wrap">
-                                      <span className="font-semibold text-slate-800">└─ {item.label}</span>
-                                      {item.nomeProduto && (
-                                        <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-black bg-blue-50 text-blue-800 border border-blue-200 shadow-2xs">
-                                          📦 Produto: {item.nomeProduto}
-                                        </span>
-                                      )}
-                                    </div>
-                                    {item.especificacao && (
-                                      <div className="text-[10px] text-slate-500 italic pl-4 border-l-2 border-slate-200 font-normal">
-                                        Detalhes: {item.especificacao}
-                                      </div>
-                                    )}
-                                  </div>
+                                <td className="p-3 border border-slate-200 font-mono text-[10px] text-slate-400">
+                                  {String(idx + 1).padStart(2, "0")}.{iIdx + 1}
                                 </td>
-                                <td className="p-2.5 text-center border border-slate-200 font-mono font-bold text-blue-900 bg-blue-50/40">
-                                  {item.quant > 0 ? (
-                                    <span className="px-2 py-0.5 rounded bg-blue-100/80 text-blue-900">
-                                      {item.quant.toLocaleString("pt-MZ")}{item.precoUnitario ? ` (× ${item.precoUnitario.toLocaleString("pt-MZ")} MT)` : ""}
-                                    </span>
-                                  ) : "—"}
+                                <td className="p-3 border border-slate-200 font-medium text-slate-600">
+                                  ↳ {row.label}
                                 </td>
-                                <td className="p-2.5 text-right border border-slate-200 font-mono font-semibold text-slate-800">
+                                <td className="p-3 border border-slate-200 font-semibold text-slate-800">
+                                  {item.label}
+                                </td>
+                                <td className="p-3 border border-slate-200 font-medium text-slate-700">
+                                  {item.nomeProduto || "—"}
+                                  {item.especificacao && <div className="text-[10px] text-slate-500 italic">{item.especificacao}</div>}
+                                </td>
+                                <td className="p-3 text-center border border-slate-200 font-mono font-bold text-blue-900 bg-blue-50/40">
+                                  {item.quant > 0 ? item.quant.toLocaleString("pt-MZ") : "—"}
+                                </td>
+                                <td className="p-3 text-right border border-slate-200 font-mono font-semibold text-slate-800">
                                   {item.valor.toLocaleString("pt-MZ", {
                                     minimumFractionDigits: 2,
                                     maximumFractionDigits: 2,
-                                  })}
+                                  }) + " MZN"}
                                 </td>
                               </tr>
                             ))}
@@ -2398,6 +2106,9 @@ export default function AcaoOrcamentalView({
                     <td className="p-3 border border-slate-400 text-left font-black uppercase">
                       Total Geral
                     </td>
+                    <td className="p-3 border border-slate-400"></td>
+                    <td className="p-3 border border-slate-400"></td>
+                    <td className="p-3 border border-slate-400"></td>
                     <td className="p-3 text-center border border-slate-400 font-mono font-black text-blue-950">
                       {sistafeGrandTotals.quant.toLocaleString("pt-MZ")}
                     </td>
@@ -2484,7 +2195,18 @@ export default function AcaoOrcamentalView({
               </table>
             </div>
           </div>
-          </>)}
+          </>
+          ) : (
+            <div className="bg-white p-16 rounded-3xl border-2 border-dashed border-slate-200 text-center">
+              <div className="bg-slate-50 w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-6">
+                <LayoutGrid className="text-slate-300" size={40} />
+              </div>
+              <h3 className="text-xl font-black text-slate-900 tracking-tight">Sem Dados de Rúbricas</h3>
+              <p className="text-slate-500 text-sm max-w-md mx-auto mt-2 leading-relaxed">
+                As rúbricas e despesas só são geradas após a inserção de atividades e rúbricas na matriz orçamental.
+              </p>
+            </div>
+          )}
         </div>
       )}
 

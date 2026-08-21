@@ -321,14 +321,15 @@ export default function DirectorDashboard({
 
   const isDPEP =
     title.toUpperCase().includes("DPEP") ||
-    title.toUpperCase() === "CHEFE DO DPEP" ||
-    title.toUpperCase().includes("PLANIFICAÇÃO, ESTUDOS E PROJETOS") ||
-    title.toUpperCase().includes("PLANIFICAÇÃO ESTUDOS E PROJETOS") ||
+    title.toUpperCase().includes("PLANIFICAÇÃO") ||
+    title.toUpperCase().includes("PLANEAMENTO") ||
     (user?.departamento || "").toUpperCase().includes("DPEP") ||
-    (user?.departamento || "")
-      .toUpperCase()
-      .includes("PLANIFICAÇÃO, ESTUDOS") ||
-    (user?.departamento || "").toUpperCase().includes("PLANIFICAÇÃO ESTUDOS");
+    (user?.departamento || "").toUpperCase().includes("PLANIFICAÇÃO") ||
+    (user?.departamento || "").toUpperCase().includes("PLANEAMENTO") ||
+    (user?.setor || "").toUpperCase().includes("PLANIFICAÇÃO") ||
+    (user?.setor || "").toUpperCase().includes("PLANEAMENTO") ||
+    (user?.reparticao || "").toUpperCase().includes("PLANIFICAÇÃO") ||
+    (user?.reparticao || "").toUpperCase().includes("PLANEAMENTO");
 
   const isDAF =
     title.toUpperCase().includes("DAF") ||
@@ -1191,6 +1192,13 @@ export default function DirectorDashboard({
     <div className="flex h-full bg-gray-50 flex-col md:flex-row overflow-hidden font-sans">
       <div className="w-full md:w-64 bg-slate-900 text-white flex flex-row md:flex-col p-2 md:p-4 shadow-xl overflow-x-auto md:overflow-y-auto shrink-0 gap-2 md:gap-0 z-20 no-scrollbar">
         <div className="flex-1 flex flex-row md:flex-col space-y-0 md:space-y-2 gap-2 md:gap-0 min-w-max md:min-w-0">
+          {isDPEP && (
+            <div className="hidden md:block mb-4 px-3">
+              <h3 className="text-amber-500 font-black text-[11px] tracking-[0.2em] uppercase border-b border-slate-700/50 pb-2">
+                Gestão de Plano
+              </h3>
+            </div>
+          )}
           {menuItems.map((item) => (
             <button
               key={item.title}

@@ -134,6 +134,12 @@ import {
   NIVEIS_ACADEMICOS,
   ESTADOS_CIVIS,
   CATEGORIAS_FUNCIONARIOS,
+  CATEGORIAS_DOCENTES,
+  CATEGORIAS_CTAA,
+  FUNCOES_CTA,
+  FUNCOES_DOCENTES,
+  VINCULOS_CONTRATUAIS,
+  getSetoresByDepartamento,
 } from "../../constants/formOptions";
 
 const UNIDADES_ORGANICAS = UNIDADES_ORGANICAS_SISTEMA.map((u) => u.nome);
@@ -4640,46 +4646,13 @@ export default function GestaoPessoalView({
                                 className="w-full p-1 border border-gray-300 rounded"
                               >
                                 <option value=""></option>
-                                <option value="Nomeação Definitiva">
-                                  Nomeação Definitiva
-                                </option>
-                                <option value="Nomeação definitiva">
-                                  Nomeação definitiva
-                                </option>
-                                <option value="Nomeação Provisória">
-                                  Nomeação Provisória
-                                </option>
-                                <option value="Nomeação provisória">
-                                  Nomeação provisória
-                                </option>
-                                <option value="Contratado">Contratado</option>
-                                <option value="Quadro Efetivo">
-                                  Quadro Efetivo
-                                </option>
-                                <option value="Pertence ao quadro">
-                                  Pertence ao quadro
-                                </option>
-                                <option value="Não pertence ao quadro">
-                                  Não pertence ao quadro
-                                </option>
-                                <option value="Difinitivo">Difinitivo</option>
-                                <option value="Definitivo">Definitivo</option>
-                                <option value="Reformado">Reformado</option>
+                                {VINCULOS_CONTRATUAIS.map((v) => (
+                                  <option key={v} value={v}>
+                                    {v}
+                                  </option>
+                                ))}
                                 {editFormData?.vinculoContractual &&
-                                  ![
-                                    "",
-                                    "Nomeação Definitiva",
-                                    "Nomeação definitiva",
-                                    "Nomeação Provisória",
-                                    "Nomeação provisória",
-                                    "Contratado",
-                                    "Quadro Efetivo",
-                                    "Pertence ao quadro",
-                                    "Não pertence ao quadro",
-                                    "Difinitivo",
-                                    "Definitivo",
-                                    "Reformado",
-                                  ].includes(
+                                  !VINCULOS_CONTRATUAIS.includes(
                                     editFormData.vinculoContractual,
                                   ) && (
                                     <option
@@ -5582,33 +5555,33 @@ export default function GestaoPessoalView({
               >
                 <fieldset className="space-y-8">
                   {/* Secção 1: DADOS PESSOAIS */}
-                  <div className="border border-black rounded-[2rem] p-8 space-y-6 relative">
-                    <div className="absolute -top-3 left-6 bg-white px-4 flex items-center gap-2">
-                      <div className="w-1 h-4 bg-blue-600 rounded-full"></div>
-                      <h3 className="text-[10px] font-black text-blue-900 tracking-[0.2em]">
+                  <div className="border border-black rounded-[2rem] p-6 md:p-8 space-y-6 relative bg-white">
+                    <div className="absolute -top-3.5 left-6 bg-white px-3 flex items-center gap-2">
+                      <div className="w-1 h-3.5 bg-blue-600 rounded-full inline-block"></div>
+                      <h3 className="text-[11px] font-black text-blue-900 tracking-[0.18em]">
                         Dados Pessoais
                       </h3>
                     </div>
-                    <div className="grid grid-cols-4 gap-4">
+                    <div className="grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
                       <div className="col-span-1">
                         <label className="block text-[10px] font-bold text-red-600 mb-1 tracking-tight">
                           Nº Processo / ID Único
                         </label>
                         <input
                           type="text"
-                          className="w-full px-4 py-2 rounded-xl border-2 border-red-200 bg-red-50 text-red-700 font-black outline-none h-11 cursor-not-allowed shadow-sm"
+                          className="w-full px-4 py-2.5 rounded-xl border border-red-200 bg-red-50/70 text-red-700 font-black outline-none h-11 cursor-not-allowed shadow-xs text-sm tracking-wide"
                           value={selectedColaborador.numeroProcesso || ""}
                           readOnly
                           disabled
                         />
                       </div>
-                      <div className="col-span-1">
+                      <div className="col-span-1 md:col-span-3">
                         <label className="block text-[10px] font-bold text-gray-700 mb-1 tracking-tight">
                           Nome Completo
                         </label>
                         <input
                           type="text"
-                          className="w-full px-4 py-2 rounded-xl border border-gray-200 focus:ring-2 focus:ring-blue-500 transition-all outline-none font-medium h-11"
+                          className="w-full px-4 py-2.5 rounded-xl border border-gray-200 focus:ring-2 focus:ring-blue-500 transition-all outline-none font-medium h-11 text-base text-gray-900"
                           value={selectedColaborador.nome || ""}
                           onChange={(e) =>
                             setSelectedColaborador({
@@ -5616,15 +5589,19 @@ export default function GestaoPessoalView({
                               nome: e.target.value,
                             })
                           }
+                          placeholder="Digite o nome completo"
                           required
                         />
                       </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4 items-end">
                       <div>
                         <label className="block text-[10px] font-bold text-gray-700 mb-1 tracking-tight">
                           Género
                         </label>
                         <select
-                          className="w-full px-4 py-2 rounded-xl border border-gray-200 focus:ring-2 focus:ring-blue-500 transition-all outline-none bg-white font-medium h-11"
+                          className="w-full px-4 py-2.5 rounded-xl border border-gray-200 focus:ring-2 focus:ring-blue-500 transition-all outline-none bg-white font-medium h-11 text-sm"
                           value={selectedColaborador.genero || "M"}
                           onChange={(e) =>
                             setSelectedColaborador({
@@ -5643,7 +5620,7 @@ export default function GestaoPessoalView({
                         </label>
                         <input
                           type="text"
-                          className="w-full px-4 py-2 rounded-xl border border-gray-200 focus:ring-2 focus:ring-blue-500 transition-all outline-none font-medium h-11"
+                          className="w-full px-4 py-2.5 rounded-xl border border-gray-200 focus:ring-2 focus:ring-blue-500 transition-all outline-none font-medium h-11 text-sm"
                           value={selectedColaborador.nuit || ""}
                           onChange={(e) =>
                             setSelectedColaborador({
@@ -5656,13 +5633,13 @@ export default function GestaoPessoalView({
                       <div>
                         <label className="block text-[10px] font-bold text-gray-700 mb-1 tracking-tight">
                           Email{" "}
-                          <span className="font-serif italic capitalize">
-                            pessoal
+                          <span className="font-serif italic font-normal text-gray-700">
+                            Pessoal
                           </span>
                         </label>
                         <input
                           type="email"
-                          className="w-full px-4 py-2 rounded-xl border border-gray-200 focus:ring-2 focus:ring-blue-500 transition-all outline-none font-medium h-11"
+                          className="w-full px-4 py-2.5 rounded-xl border border-gray-200 focus:ring-2 focus:ring-blue-500 transition-all outline-none font-medium h-11 text-sm"
                           value={selectedColaborador.email || ""}
                           onChange={(e) =>
                             setSelectedColaborador({
@@ -5678,7 +5655,7 @@ export default function GestaoPessoalView({
                         </label>
                         <input
                           type="text"
-                          className="w-full px-4 py-2 rounded-xl border border-gray-200 focus:ring-2 focus:ring-blue-500 transition-all outline-none font-medium h-11"
+                          className="w-full px-4 py-2.5 rounded-xl border border-gray-200 focus:ring-2 focus:ring-blue-500 transition-all outline-none font-medium h-11 text-sm"
                           value={selectedColaborador.telefone || ""}
                           onChange={(e) =>
                             setSelectedColaborador({
@@ -5688,12 +5665,15 @@ export default function GestaoPessoalView({
                           }
                         />
                       </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
                       <div>
                         <label className="block text-[10px] font-bold text-gray-700 mb-1 tracking-tight">
                           Estado Civil
                         </label>
                         <select
-                          className="w-full px-4 py-2 rounded-xl border border-gray-200 focus:ring-2 focus:ring-blue-500 transition-all outline-none bg-white font-medium h-11"
+                          className="w-full px-4 py-2.5 rounded-xl border border-gray-200 focus:ring-2 focus:ring-blue-500 transition-all outline-none bg-white font-medium h-11 text-sm"
                           value={selectedColaborador.estadoCivil || ""}
                           onChange={(e) =>
                             setSelectedColaborador({
@@ -5710,15 +5690,13 @@ export default function GestaoPessoalView({
                           ))}
                         </select>
                       </div>
-                    </div>
-                    <div className="grid grid-cols-2 gap-4">
                       <div>
                         <label className="block text-[10px] font-bold text-gray-700 mb-1 tracking-tight">
                           Nome do Pai
                         </label>
                         <input
                           type="text"
-                          className="w-full px-4 py-2 rounded-xl border border-gray-200 focus:ring-2 focus:ring-blue-500 transition-all outline-none font-medium h-11"
+                          className="w-full px-4 py-2.5 rounded-xl border border-gray-200 focus:ring-2 focus:ring-blue-500 transition-all outline-none font-medium h-11 text-sm"
                           value={selectedColaborador.filiacaoPai || ""}
                           onChange={(e) =>
                             setSelectedColaborador({
@@ -5734,7 +5712,7 @@ export default function GestaoPessoalView({
                         </label>
                         <input
                           type="text"
-                          className="w-full px-4 py-2 rounded-xl border border-gray-200 focus:ring-2 focus:ring-blue-500 transition-all outline-none font-medium h-11"
+                          className="w-full px-4 py-2.5 rounded-xl border border-gray-200 focus:ring-2 focus:ring-blue-500 transition-all outline-none font-medium h-11 text-sm"
                           value={selectedColaborador.filiacaoMae || ""}
                           onChange={(e) =>
                             setSelectedColaborador({
@@ -5745,14 +5723,15 @@ export default function GestaoPessoalView({
                         />
                       </div>
                     </div>
-                    <div className="grid grid-cols-4 gap-4">
+
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
                       <div>
                         <label className="block text-[10px] font-bold text-gray-700 mb-1 tracking-tight">
                           BI /
                         </label>
                         <input
                           type="text"
-                          className="w-full px-4 py-2 rounded-xl border border-gray-200 focus:ring-2 focus:ring-blue-500 transition-all outline-none font-medium h-11"
+                          className="w-full px-4 py-2.5 rounded-xl border border-gray-200 focus:ring-2 focus:ring-blue-500 transition-all outline-none font-medium h-11 text-sm"
                           value={selectedColaborador.numeroBI || ""}
                           onChange={(e) =>
                             setSelectedColaborador({
@@ -5764,11 +5743,11 @@ export default function GestaoPessoalView({
                       </div>
                       <div>
                         <label className="block text-[10px] font-bold text-gray-700 mb-1 tracking-tight">
-                          Emitido em
+                          Emitido em:
                         </label>
                         <input
                           type="text"
-                          className="w-full px-4 py-2 rounded-xl border border-gray-200 focus:ring-2 focus:ring-blue-500 transition-all outline-none font-medium h-11"
+                          className="w-full px-4 py-2.5 rounded-xl border border-gray-200 focus:ring-2 focus:ring-blue-500 transition-all outline-none font-medium h-11 text-sm"
                           value={selectedColaborador.biEm || ""}
                           onChange={(e) =>
                             setSelectedColaborador({
@@ -5785,7 +5764,7 @@ export default function GestaoPessoalView({
                         </label>
                         <input
                           type="date"
-                          className="w-full px-4 py-2 rounded-xl border border-gray-200 focus:ring-2 focus:ring-blue-500 transition-all outline-none font-medium h-11"
+                          className="w-full px-4 py-2.5 rounded-xl border border-gray-200 focus:ring-2 focus:ring-blue-500 transition-all outline-none font-medium h-11 text-sm"
                           value={selectedColaborador.biEmitidoA || ""}
                           onChange={(e) =>
                             setSelectedColaborador({
@@ -5795,57 +5774,25 @@ export default function GestaoPessoalView({
                           }
                         />
                       </div>
-                      <div>
-                        <label className="block text-[10px] font-bold text-gray-700 mb-1 tracking-tight">
-                          Passaporte Nº
-                        </label>
-                        <input
-                          type="text"
-                          className="w-full px-4 py-2 rounded-xl border border-gray-200 focus:ring-2 focus:ring-blue-500 transition-all outline-none font-medium h-11"
-                          value={selectedColaborador.passaporteNo || ""}
-                          onChange={(e) =>
-                            setSelectedColaborador({
-                              ...selectedColaborador,
-                              passaporteNo: e.target.value,
-                            })
-                          }
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-[10px] font-bold text-gray-700 mb-1 tracking-tight">
-                          Emitido em
-                        </label>
-                        <input
-                          type="text"
-                          className="w-full px-4 py-2 rounded-xl border border-gray-200 focus:ring-2 focus:ring-blue-500 transition-all outline-none font-medium h-11"
-                          value={selectedColaborador.passaporteEmitidoEm || ""}
-                          onChange={(e) =>
-                            setSelectedColaborador({
-                              ...selectedColaborador,
-                              passaporteEmitidoEm: e.target.value,
-                            })
-                          }
-                        />
-                      </div>
                     </div>
                   </div>
 
                   {/* Secção 2: LOCAL DE NASCIMENTO */}
-                  <div className="border border-black rounded-[2rem] p-8 space-y-6 relative">
-                    <div className="absolute -top-3 left-6 bg-white px-4 flex items-center gap-2">
-                      <div className="w-1 h-4 bg-blue-600 rounded-full"></div>
-                      <h3 className="text-[10px] font-black text-blue-900 tracking-[0.2em]">
+                  <div className="border border-black rounded-[2rem] p-6 md:p-8 space-y-6 relative bg-white">
+                    <div className="absolute -top-3.5 left-6 bg-white px-3 flex items-center gap-2">
+                      <div className="w-1 h-3.5 bg-blue-600 rounded-full inline-block"></div>
+                      <h3 className="text-[11px] font-black text-blue-900 tracking-[0.18em]">
                         Local de Nascimento
                       </h3>
                     </div>
-                    <div className="grid grid-cols-4 gap-4">
+                    <div className="grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
                       <div>
                         <label className="block text-[10px] font-bold text-gray-700 mb-1 tracking-tight">
                           Nacionalidade
                         </label>
                         <input
                           type="text"
-                          className="w-full px-4 py-2 rounded-xl border border-gray-200 focus:ring-2 focus:ring-blue-500 transition-all outline-none font-medium h-11"
+                          className="w-full px-4 py-2.5 rounded-xl border border-gray-200 focus:ring-2 focus:ring-blue-500 transition-all outline-none font-medium h-11 text-sm"
                           value={
                             selectedColaborador.nacionalidade || "Moçambique"
                           }
@@ -5862,7 +5809,7 @@ export default function GestaoPessoalView({
                           Província de Nascimento
                         </label>
                         <select
-                          className="w-full px-4 py-2 rounded-xl border border-gray-200 focus:ring-2 focus:ring-blue-500 transition-all outline-none bg-white font-medium h-11"
+                          className="w-full px-4 py-2.5 rounded-xl border border-gray-200 focus:ring-2 focus:ring-blue-500 transition-all outline-none bg-white font-medium h-11 text-sm"
                           value={
                             selectedColaborador.localNascimento?.provincia || ""
                           }
@@ -5892,7 +5839,7 @@ export default function GestaoPessoalView({
                           Distrito
                         </label>
                         <select
-                          className="w-full px-4 py-2 rounded-xl border border-gray-200 focus:ring-2 focus:ring-blue-500 transition-all outline-none bg-white font-medium h-11"
+                          className="w-full px-4 py-2.5 rounded-xl border border-gray-200 focus:ring-2 focus:ring-blue-500 transition-all outline-none bg-white font-medium h-11 text-sm"
                           value={
                             selectedColaborador.localNascimento?.distrito || ""
                           }
@@ -5928,7 +5875,7 @@ export default function GestaoPessoalView({
                         </label>
                         <input
                           type="date"
-                          className="w-full px-4 py-2 rounded-xl border border-gray-200 focus:ring-2 focus:ring-blue-500 transition-all outline-none font-medium h-11"
+                          className="w-full px-4 py-2.5 rounded-xl border border-gray-200 focus:ring-2 focus:ring-blue-500 transition-all outline-none font-medium h-11 text-sm"
                           value={selectedColaborador.dataNascimento || ""}
                           onChange={(e) =>
                             setSelectedColaborador({
@@ -5939,14 +5886,15 @@ export default function GestaoPessoalView({
                         />
                       </div>
                     </div>
-                    <div className="grid grid-cols-4 gap-4">
-                      <div className="col-span-2">
+
+                    <div className="grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
+                      <div className="md:col-span-2">
                         <label className="block text-[10px] font-bold text-gray-700 mb-1 tracking-tight">
                           Morada (Província, Distrito, Bairro)
                         </label>
                         <input
                           type="text"
-                          className="w-full px-4 py-2 rounded-xl border border-gray-200 focus:ring-2 focus:ring-blue-500 transition-all outline-none font-medium h-11"
+                          className="w-full px-4 py-2.5 rounded-xl border border-gray-200 focus:ring-2 focus:ring-blue-500 transition-all outline-none font-medium h-11 text-sm"
                           value={selectedColaborador.morada || ""}
                           onChange={(e) =>
                             setSelectedColaborador({
@@ -5956,13 +5904,13 @@ export default function GestaoPessoalView({
                           }
                         />
                       </div>
-                      <div>
+                      <div className="md:col-span-1">
                         <label className="block text-[10px] font-bold text-gray-700 mb-1 tracking-tight">
                           Bairro
                         </label>
                         <input
                           type="text"
-                          className="w-full px-4 py-2 rounded-xl border border-gray-200 focus:ring-2 focus:ring-blue-500 transition-all outline-none font-medium h-11"
+                          className="w-full px-4 py-2.5 rounded-xl border border-gray-200 focus:ring-2 focus:ring-blue-500 transition-all outline-none font-medium h-11 text-sm"
                           value={selectedColaborador.bairro || ""}
                           onChange={(e) =>
                             setSelectedColaborador({
@@ -5972,13 +5920,13 @@ export default function GestaoPessoalView({
                           }
                         />
                       </div>
-                      <div>
+                      <div className="md:col-span-1">
                         <label className="block text-[10px] font-bold text-gray-700 mb-1 tracking-tight">
                           Distrito (Residência)
                         </label>
                         <input
                           type="text"
-                          className="w-full px-4 py-2 rounded-xl border border-gray-200 focus:ring-2 focus:ring-blue-500 transition-all outline-none font-medium h-11"
+                          className="w-full px-4 py-2.5 rounded-xl border border-gray-200 focus:ring-2 focus:ring-blue-500 transition-all outline-none font-medium h-11 text-sm"
                           value={selectedColaborador.distrito || ""}
                           onChange={(e) =>
                             setSelectedColaborador({
@@ -5988,13 +5936,16 @@ export default function GestaoPessoalView({
                           }
                         />
                       </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
                       <div>
                         <label className="block text-[10px] font-bold text-gray-700 mb-1 tracking-tight">
                           Célula
                         </label>
                         <input
                           type="text"
-                          className="w-full px-4 py-2 rounded-xl border border-gray-200 focus:ring-2 focus:ring-blue-500 transition-all outline-none font-medium h-11"
+                          className="w-full px-4 py-2.5 rounded-xl border border-gray-200 focus:ring-2 focus:ring-blue-500 transition-all outline-none font-medium h-11 text-sm"
                           value={selectedColaborador.celula || ""}
                           onChange={(e) =>
                             setSelectedColaborador({
@@ -6010,7 +5961,7 @@ export default function GestaoPessoalView({
                         </label>
                         <input
                           type="text"
-                          className="w-full px-4 py-2 rounded-xl border border-gray-200 focus:ring-2 focus:ring-blue-500 transition-all outline-none font-medium h-11"
+                          className="w-full px-4 py-2.5 rounded-xl border border-gray-200 focus:ring-2 focus:ring-blue-500 transition-all outline-none font-medium h-11 text-sm"
                           value={
                             selectedColaborador.quarteirao ||
                             selectedColaborador.quarteiraoNo ||
@@ -6024,15 +5975,13 @@ export default function GestaoPessoalView({
                           }
                         />
                       </div>
-                    </div>
-                    <div className="grid grid-cols-4 gap-4">
                       <div>
                         <label className="block text-[10px] font-bold text-gray-700 mb-1 tracking-tight">
                           Casa No
                         </label>
                         <input
                           type="text"
-                          className="w-full px-4 py-2 rounded-xl border border-gray-200 focus:ring-2 focus:ring-blue-500 transition-all outline-none font-medium h-11"
+                          className="w-full px-4 py-2.5 rounded-xl border border-gray-200 focus:ring-2 focus:ring-blue-500 transition-all outline-none font-medium h-11 text-sm"
                           value={selectedColaborador.casaNo || ""}
                           onChange={(e) =>
                             setSelectedColaborador({
@@ -6048,12 +5997,12 @@ export default function GestaoPessoalView({
                         </label>
                         <input
                           type="number"
-                          className="w-full px-4 py-2 rounded-xl border border-gray-200 focus:ring-2 focus:ring-blue-500 transition-all outline-none font-medium h-11"
+                          className="w-full px-4 py-2.5 rounded-xl border border-gray-200 focus:ring-2 focus:ring-blue-500 transition-all outline-none font-medium h-11 text-sm"
                           value={selectedColaborador.numFilhos || 0}
                           onChange={(e) =>
                             setSelectedColaborador({
                               ...selectedColaborador,
-                              numFilhos: parseInt(e.target.value),
+                              numFilhos: parseInt(e.target.value) || 0,
                             })
                           }
                         />
@@ -6061,21 +6010,413 @@ export default function GestaoPessoalView({
                     </div>
                   </div>
 
-                  {/* Secção 3: ALOCAÇÃO INSTITUCIONAL */}
-                  <div className="border border-black rounded-[2rem] p-8 space-y-6 relative">
-                    <div className="absolute -top-3 left-6 bg-white px-4 flex items-center gap-2">
-                      <div className="w-1 h-4 bg-blue-600 rounded-full"></div>
-                      <h3 className="text-[10px] font-black text-blue-900 tracking-[0.2em]">
-                        Alocação Institucional
+                  {/* Secção 3: DADOS PROFISSIONAIS & FORMAÇÃO ACADÉMICA */}
+                  <div className="border border-black rounded-[2rem] p-6 md:p-8 space-y-6 relative bg-white">
+                    <div className="absolute -top-3.5 left-6 bg-white px-3 flex items-center gap-2">
+                      <div className="w-1 h-3.5 bg-blue-600 rounded-full inline-block"></div>
+                      <h3 className="text-[11px] font-black text-blue-900 tracking-[0.18em]">
+                        Dados Profissionais & Formação Académica
                       </h3>
                     </div>
-                    <div className="grid grid-cols-3 gap-4">
+
+                    {/* Linha 1: Carreira | Categoria | Função */}
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
+                      <div>
+                        <label className="block text-[10px] font-bold text-gray-700 mb-1 tracking-tight">
+                          Carreira
+                        </label>
+                        <select
+                          className="w-full px-4 py-2.5 rounded-xl border border-gray-200 focus:ring-2 focus:ring-blue-500 transition-all outline-none bg-white font-medium h-11 text-sm"
+                          value={selectedColaborador.carreira || ""}
+                          onChange={(e) =>
+                            setSelectedColaborador({
+                              ...selectedColaborador,
+                              carreira: e.target.value,
+                              tipo: (e.target.value === "CTA" ? "CTA" : e.target.value === "Docente" ? "Docente" : selectedColaborador.tipo) as any,
+                            })
+                          }
+                        >
+                          <option value="">Selecione...</option>
+                          <option value="Docente">Docente</option>
+                          <option value="CTA">CTA</option>
+                          <option value="Investigador">Investigador</option>
+                        </select>
+                      </div>
+                      <div>
+                        <label className="block text-[10px] font-bold text-gray-700 mb-1 tracking-tight">
+                          Categoria
+                        </label>
+                        <select
+                          className="w-full px-4 py-2.5 rounded-xl border border-gray-200 focus:ring-2 focus:ring-blue-500 transition-all outline-none bg-white font-medium h-11 text-sm"
+                          value={selectedColaborador.categoria || ""}
+                          onChange={(e) => {
+                            const val = e.target.value;
+                            let newCarreira = selectedColaborador.carreira;
+                            if (CATEGORIAS_DOCENTES.includes(val) && val !== "Assistente") {
+                              newCarreira = "Docente";
+                            } else if (["Técnico Superior", "Técnico Profissional", "Técnico"].includes(val)) {
+                              newCarreira = "CTA";
+                            } else if (val === "Assistente" && !newCarreira) {
+                              newCarreira = "Docente";
+                            } else {
+                              const resolvedTipo = classifyTipo({
+                                categoria: val,
+                                carreira: selectedColaborador.carreira,
+                              });
+                              newCarreira = resolvedTipo;
+                            }
+                            setSelectedColaborador({
+                              ...selectedColaborador,
+                              categoria: val,
+                              tipo: newCarreira as any,
+                              carreira: newCarreira,
+                            });
+                          }}
+                        >
+                          <option value="">Selecione...</option>
+                          {selectedColaborador.carreira === "Docente" ? (
+                            <optgroup label="Docentes">
+                              {CATEGORIAS_DOCENTES.map((c) => (
+                                <option key={`doc-${c}`} value={c}>
+                                  {c}
+                                </option>
+                              ))}
+                            </optgroup>
+                          ) : selectedColaborador.carreira === "CTA" ? (
+                            <optgroup label="CTAA">
+                              {CATEGORIAS_CTAA.map((c) => (
+                                <option key={`cta-${c}`} value={c}>
+                                  {c}
+                                </option>
+                              ))}
+                            </optgroup>
+                          ) : (
+                            <>
+                              <optgroup label="Docentes">
+                                {CATEGORIAS_DOCENTES.map((c) => (
+                                  <option key={`all-doc-${c}`} value={c}>
+                                    {c}
+                                  </option>
+                                ))}
+                              </optgroup>
+                              <optgroup label="CTAA">
+                                {CATEGORIAS_CTAA.map((c) => (
+                                  <option key={`all-cta-${c}`} value={c}>
+                                    {c}
+                                  </option>
+                                ))}
+                              </optgroup>
+                              <optgroup label="Outras">
+                                <option value="Proprietário e Programador do Sistema">
+                                  Proprietário e Programador do Sistema
+                                </option>
+                              </optgroup>
+                            </>
+                          )}
+                          {selectedColaborador.categoria &&
+                            !CATEGORIAS_DOCENTES.includes(selectedColaborador.categoria) &&
+                            !CATEGORIAS_CTAA.includes(selectedColaborador.categoria) &&
+                            selectedColaborador.categoria !== "Proprietário e Programador do Sistema" && (
+                              <option value={selectedColaborador.categoria}>
+                                {selectedColaborador.categoria}
+                              </option>
+                            )}
+                        </select>
+                      </div>
+                      <div>
+                        <label className="block text-[10px] font-bold text-gray-700 mb-1 tracking-tight">
+                          Função
+                        </label>
+                        <select
+                          className="w-full px-4 py-2.5 rounded-xl border border-gray-200 focus:ring-2 focus:ring-blue-500 transition-all outline-none bg-white font-medium h-11 text-sm"
+                          value={selectedColaborador.funcao || ""}
+                          onChange={(e) =>
+                            setSelectedColaborador({
+                              ...selectedColaborador,
+                              funcao: e.target.value,
+                            })
+                          }
+                        >
+                          <option value="">Selecione...</option>
+                          {selectedColaborador.carreira === "CTA" ? (
+                            <optgroup label="Funções CTA / CTAA">
+                              {FUNCOES_CTA.map((f) => (
+                                <option key={`cta-f-${f}`} value={f}>
+                                  {f}
+                                </option>
+                              ))}
+                            </optgroup>
+                          ) : selectedColaborador.carreira === "Docente" ? (
+                            <optgroup label="Funções Docente">
+                              {FUNCOES_DOCENTES.map((f) => (
+                                <option key={`doc-f-${f}`} value={f}>
+                                  {f}
+                                </option>
+                              ))}
+                            </optgroup>
+                          ) : (
+                            <>
+                              <optgroup label="Funções CTA / CTAA">
+                                {FUNCOES_CTA.map((f) => (
+                                  <option key={`all-cta-f-${f}`} value={f}>
+                                    {f}
+                                  </option>
+                                ))}
+                              </optgroup>
+                              <optgroup label="Funções Docente">
+                                {FUNCOES_DOCENTES.map((f) => (
+                                  <option key={`all-doc-f-${f}`} value={f}>
+                                    {f}
+                                  </option>
+                                ))}
+                              </optgroup>
+                            </>
+                          )}
+                          {selectedColaborador.funcao &&
+                            !FUNCOES_CTA.includes(selectedColaborador.funcao) &&
+                            !FUNCOES_DOCENTES.includes(selectedColaborador.funcao) && (
+                              <option value={selectedColaborador.funcao}>
+                                {selectedColaborador.funcao}
+                              </option>
+                            )}
+                        </select>
+                      </div>
+                    </div>
+
+                    {/* Linha 2: Efetivo | Tipo de Contrato | Vínculo Contratual | Data de Admissão */}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4 items-end">
+                      <div>
+                        <label className="block text-[10px] font-bold text-gray-700 mb-1 tracking-tight">
+                          Efetivo
+                        </label>
+                        <select
+                          className="w-full px-4 py-2.5 rounded-xl border border-gray-200 focus:ring-2 focus:ring-blue-500 transition-all outline-none bg-white font-medium h-11 text-sm"
+                          value={selectedColaborador.efetivo ? "Sim" : "Não"}
+                          onChange={(e) =>
+                            setSelectedColaborador({
+                              ...selectedColaborador,
+                              efetivo: e.target.value === "Sim",
+                            })
+                          }
+                        >
+                          <option value="Sim">Sim</option>
+                          <option value="Não">Não</option>
+                        </select>
+                      </div>
+                      <div>
+                        <label className="block text-[10px] font-bold text-gray-700 mb-1 tracking-tight">
+                          Tipo de Contrato
+                        </label>
+                        <select
+                          className="w-full px-4 py-2.5 rounded-xl border border-gray-200 focus:ring-2 focus:ring-blue-500 transition-all outline-none bg-white font-medium h-11 text-sm"
+                          value={selectedColaborador.tipoContrato || ""}
+                          onChange={(e) =>
+                            setSelectedColaborador({
+                              ...selectedColaborador,
+                              tipoContrato: e.target.value,
+                            })
+                          }
+                        >
+                          <option value="">Selecione...</option>
+                          <option value="Tempo inteiro">Tempo inteiro</option>
+                          <option value="Tempo Parcial">Tempo Parcial</option>
+                        </select>
+                      </div>
+                      <div>
+                        <label className="block text-[10px] font-bold text-gray-700 mb-1 tracking-tight">
+                          Vínculo Contratual
+                        </label>
+                        <select
+                          className="w-full px-4 py-2.5 rounded-xl border border-gray-200 focus:ring-2 focus:ring-blue-500 transition-all outline-none bg-white font-medium h-11 text-sm"
+                          value={selectedColaborador.vinculoContractual || ""}
+                          onChange={(e) =>
+                            setSelectedColaborador({
+                              ...selectedColaborador,
+                              vinculoContractual: e.target.value,
+                            })
+                          }
+                        >
+                          <option value="">Selecione...</option>
+                          {VINCULOS_CONTRATUAIS.map((v) => (
+                            <option key={v} value={v}>
+                              {v}
+                            </option>
+                          ))}
+                          {selectedColaborador.vinculoContractual &&
+                            !VINCULOS_CONTRATUAIS.includes(
+                              selectedColaborador.vinculoContractual,
+                            ) && (
+                              <option
+                                value={selectedColaborador.vinculoContractual}
+                              >
+                                {selectedColaborador.vinculoContractual}
+                              </option>
+                            )}
+                        </select>
+                      </div>
+                      <div>
+                        <label className="block text-[10px] font-bold text-gray-700 mb-1 tracking-tight">
+                          Data de Admissão
+                        </label>
+                        <input
+                          type="date"
+                          className="w-full px-4 py-2.5 rounded-xl border border-gray-200 focus:ring-2 focus:ring-blue-500 transition-all outline-none font-medium h-11 text-sm"
+                          value={selectedColaborador.dataAdmissao || ""}
+                          onChange={(e) =>
+                            setSelectedColaborador({
+                              ...selectedColaborador,
+                              dataAdmissao: e.target.value,
+                            })
+                          }
+                        />
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-end">
+                      <div>
+                        <label className="block text-[10px] font-bold text-gray-700 mb-1 tracking-tight">
+                          Nível Académico
+                        </label>
+                        <select
+                          className="w-full px-4 py-2.5 rounded-xl border border-gray-200 focus:ring-2 focus:ring-blue-500 transition-all outline-none bg-white font-medium h-11 text-sm"
+                          value={selectedColaborador.nivelAcademico || ""}
+                          onChange={(e) =>
+                            setSelectedColaborador({
+                              ...selectedColaborador,
+                              nivelAcademico: e.target.value,
+                            })
+                          }
+                        >
+                          <option value="">Selecione...</option>
+                          {NIVEIS_ACADEMICOS.map((n) => (
+                            <option key={n} value={n}>
+                              {n}
+                            </option>
+                          ))}
+                          {selectedColaborador.nivelAcademico &&
+                            !NIVEIS_ACADEMICOS.includes(
+                              selectedColaborador.nivelAcademico,
+                            ) && (
+                              <option value={selectedColaborador.nivelAcademico}>
+                                {selectedColaborador.nivelAcademico}
+                              </option>
+                            )}
+                        </select>
+                      </div>
+                      <div>
+                        <label className="block text-[10px] font-bold text-gray-700 mb-1 tracking-tight">
+                          Área de Formação
+                        </label>
+                        <input
+                          type="text"
+                          className="w-full px-4 py-2.5 rounded-xl border border-gray-200 focus:ring-2 focus:ring-blue-500 transition-all outline-none font-medium h-11 text-sm"
+                          value={selectedColaborador.areaFormacao || ""}
+                          onChange={(e) =>
+                            setSelectedColaborador({
+                              ...selectedColaborador,
+                              areaFormacao: e.target.value,
+                            })
+                          }
+                          placeholder="Digite a área de formação"
+                        />
+                      </div>
+                    </div>
+
+                    {/* Subseção de Disciplinas Leccionadas - apenas para Docentes */}
+                    {(selectedColaborador.carreira === "Docente" ||
+                      (!selectedColaborador.carreira && selectedColaborador.tipo === "Docente")) && (
+                      <div className="pt-4 border-t border-gray-100 space-y-4">
+                        <label className="block text-[11px] font-black text-blue-900 tracking-wider uppercase">
+                          DISCIPLINAS LECCIONADAS (ATÉ 4)
+                        </label>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-end">
+                          {[0, 1].map((idx) => {
+                            const discList =
+                              selectedColaborador.disciplinas || [
+                                "",
+                                "",
+                                "",
+                                "",
+                              ];
+                            return (
+                              <div key={idx}>
+                                <label className="block text-[9px] font-bold text-gray-500 mb-1 uppercase tracking-tight">
+                                  DISCIPLINA {idx + 1}
+                                </label>
+                                <input
+                                  type="text"
+                                  className="w-full px-4 py-2.5 rounded-xl border border-gray-200 focus:ring-2 focus:ring-blue-500 transition-all outline-none font-medium h-11 text-sm"
+                                  placeholder={`Disciplina ${idx + 1}`}
+                                  value={discList[idx] || ""}
+                                  onChange={(e) => {
+                                    const newList = [...discList];
+                                    newList[idx] = e.target.value;
+                                    setSelectedColaborador({
+                                      ...selectedColaborador,
+                                      disciplinas: newList,
+                                    });
+                                  }}
+                                />
+                              </div>
+                            );
+                          })}
+                        </div>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-end">
+                          {[2, 3].map((idx) => {
+                            const discList =
+                              selectedColaborador.disciplinas || [
+                                "",
+                                "",
+                                "",
+                                "",
+                              ];
+                            return (
+                              <div key={idx}>
+                                <label className="block text-[9px] font-bold text-gray-500 mb-1 uppercase tracking-tight">
+                                  DISCIPLINA {idx + 1}
+                                </label>
+                                <input
+                                  type="text"
+                                  className="w-full px-4 py-2.5 rounded-xl border border-gray-200 focus:ring-2 focus:ring-blue-500 transition-all outline-none font-medium h-11 text-sm"
+                                  placeholder={`Disciplina ${idx + 1}`}
+                                  value={discList[idx] || ""}
+                                  onChange={(e) => {
+                                    const newList = [...discList];
+                                    newList[idx] = e.target.value;
+                                    setSelectedColaborador({
+                                      ...selectedColaborador,
+                                      disciplinas: newList,
+                                    });
+                                  }}
+                                />
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Secção 4: ALOCAÇÃO INSTITUCIONAL & CARGO DE CHEFIA E CONFIANÇAS (Card Unificado) */}
+                  <div className="border border-black rounded-[2rem] p-6 md:p-8 space-y-6 relative bg-white">
+                    <div className="absolute -top-3.5 left-6 bg-white px-3 flex items-center gap-3">
+                      <div className="w-1 h-3.5 bg-blue-600 rounded-full inline-block"></div>
+                      <h3 className="text-[11px] font-black text-blue-900 tracking-[0.18em]">
+                        Alocação Institucional
+                      </h3>
+                      <h3 className="text-[11px] font-black text-blue-900 tracking-[0.18em] ml-2">
+                        Cargo de Chefia e Confianças
+                      </h3>
+                      <div className="w-1 h-3.5 bg-blue-600 rounded-full inline-block"></div>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
                       <div>
                         <label className="block text-[10px] font-bold text-gray-700 mb-1 tracking-tight">
                           Órgão
                         </label>
                         <select
-                          className="w-full px-4 py-2 rounded-xl border border-gray-200 focus:ring-2 focus:ring-blue-500 transition-all outline-none bg-white font-medium h-11"
+                          className="w-full px-4 py-2.5 rounded-xl border border-gray-200 focus:ring-2 focus:ring-blue-500 transition-all outline-none bg-white font-medium h-11 text-sm"
                           value={selectedColaborador.unidade || ""}
                           onChange={(e) => {
                             const val = e.target.value;
@@ -6104,7 +6445,7 @@ export default function GestaoPessoalView({
                           Direção
                         </label>
                         <select
-                          className="w-full px-4 py-2 rounded-xl border border-gray-200 focus:ring-2 focus:ring-blue-500 transition-all outline-none bg-white font-medium h-11"
+                          className="w-full px-4 py-2.5 rounded-xl border border-gray-200 focus:ring-2 focus:ring-blue-500 transition-all outline-none bg-white font-medium h-11 text-sm"
                           value={selectedColaborador.direcao || ""}
                           onChange={(e) => {
                             const val = e.target.value;
@@ -6152,7 +6493,7 @@ export default function GestaoPessoalView({
                           Departamento
                         </label>
                         <select
-                          className="w-full px-4 py-2 rounded-xl border border-gray-200 focus:ring-2 focus:ring-blue-500 transition-all outline-none bg-white font-medium h-11"
+                          className="w-full px-4 py-2.5 rounded-xl border border-gray-200 focus:ring-2 focus:ring-blue-500 transition-all outline-none bg-white font-medium h-11 text-sm"
                           value={selectedColaborador.departamento || ""}
                           onChange={(e) => {
                             const val = e.target.value;
@@ -6160,7 +6501,6 @@ export default function GestaoPessoalView({
                             let inferredUni = selectedColaborador.unidade || "";
                             if (val) {
                               for (const [dKey, deptList] of Object.entries({
-                                ...DEPARTAMENTOS,
                                 ...DEPARTAMENTOS,
                               })) {
                                 if (deptList?.includes(val)) {
@@ -6197,22 +6537,13 @@ export default function GestaoPessoalView({
                           {Array.from(
                             new Set(
                               selectedColaborador.direcao &&
-                                (DEPARTAMENTOS[
+                                DEPARTAMENTOS[
                                   selectedColaborador.direcao as keyof typeof DEPARTAMENTOS
-                                ] ||
-                                  DEPARTAMENTOS[
-                                    selectedColaborador.direcao as keyof typeof DEPARTAMENTOS
-                                  ])
+                                ]
                                 ? DEPARTAMENTOS[
                                     selectedColaborador.direcao as keyof typeof DEPARTAMENTOS
-                                  ] ||
-                                    DEPARTAMENTOS[
-                                      selectedColaborador.direcao as keyof typeof DEPARTAMENTOS
-                                    ]
-                                : Object.values({
-                                    ...DEPARTAMENTOS,
-                                    ...DEPARTAMENTOS,
-                                  }).flat(),
+                                  ]
+                                : Object.values(DEPARTAMENTOS).flat(),
                             ),
                           ).map((d, idx) => (
                             <option key={`${d}-${idx}`} value={d}>
@@ -6222,194 +6553,181 @@ export default function GestaoPessoalView({
                         </select>
                       </div>
                     </div>
-                    {selectedColaborador.departamento &&
-                    [
-                      "Departamento de Engenharia Eletrotécnica",
-                      "Departamento de Engenharia de Construção Civil",
-                      "Departamento de Engenharia de Construção Mecânica",
-                    ].includes(selectedColaborador.departamento) ? (
-                      <div className="space-y-4">
-                        <label className="block text-[10px] font-black text-blue-900 tracking-widest uppercase">
-                          Afetação por Curso (Até 4)
-                        </label>
-                        <div className="grid grid-cols-2 gap-4">
-                          {[0, 1, 2, 3].map((idx) => {
-                            const currentCursos =
-                              selectedColaborador.cursos ||
-                              (selectedColaborador.curso
-                                ? [selectedColaborador.curso, "", "", ""]
-                                : ["", "", "", ""]);
-                            return (
-                              <div key={idx}>
-                                <label className="block text-[9px] font-bold text-gray-500 mb-1 uppercase tracking-tight">
-                                  Curso {idx + 1}
-                                </label>
-                                <select
-                                  className="w-full px-4 py-2 rounded-xl border border-gray-200 focus:ring-2 focus:ring-blue-500 transition-all outline-none bg-white font-medium h-11"
-                                  value={currentCursos[idx] || ""}
-                                  onChange={(e) => {
-                                    const newCursos = [...currentCursos];
-                                    newCursos[idx] = e.target.value;
-                                    const updates: any = { cursos: newCursos };
-                                    if (idx === 0)
-                                      updates.curso = e.target.value;
-                                    setSelectedColaborador({
-                                      ...selectedColaborador,
-                                      ...updates,
-                                    });
-                                  }}
-                                >
-                                  <option value="">Selecione...</option>
-                                  {CURSOS[
-                                    selectedColaborador.departamento as keyof typeof CURSOS
-                                  ]?.map((c) => (
-                                    <option key={c} value={c}>
-                                      {c}
-                                    </option>
-                                  ))}
-                                </select>
-                              </div>
-                            );
-                          })}
-                        </div>
-                      </div>
-                    ) : (
-                      <div className="grid grid-cols-2 gap-4">
-                        <div>
-                          <label className="block text-[10px] font-bold text-gray-700 mb-1 tracking-tight">
-                            Repartição / Secção
-                          </label>
-                          <select
-                            className="w-full px-4 py-2 rounded-xl border border-gray-200 focus:ring-2 focus:ring-blue-500 transition-all outline-none bg-white font-medium h-11"
-                            value={selectedColaborador.reparticao || ""}
-                            onChange={(e) => {
-                              const val = e.target.value;
-                              setSelectedColaborador({
-                                ...selectedColaborador,
-                                reparticao: val,
-                                seccao: "",
-                              });
-                            }}
-                            disabled={false}
-                          >
-                            <option value="">Selecione...</option>
-                            {Array.from(
-                              new Set(
-                                selectedColaborador.departamento &&
-                                  REPARTICOES[
-                                    selectedColaborador.departamento as keyof typeof REPARTICOES
-                                  ]
-                                  ? REPARTICOES[
-                                      selectedColaborador.departamento as keyof typeof REPARTICOES
-                                    ]
-                                  : Object.values(REPARTICOES).flat(),
-                              ),
-                            ).map((r, idx) => (
-                              <option key={`${r}-${idx}`} value={r}>
-                                {r}
-                              </option>
-                            ))}
-                          </select>
-                        </div>
-                        <div>
-                          <label className="block text-[10px] font-bold text-gray-700 mb-1 tracking-tight">
-                            Secção
-                          </label>
-                          <select
-                            className="w-full px-4 py-2 rounded-xl border border-gray-200 focus:ring-2 focus:ring-blue-500 transition-all outline-none bg-white font-medium h-11"
-                            value={selectedColaborador.seccao || ""}
-                            onChange={(e) =>
-                              setSelectedColaborador({
-                                ...selectedColaborador,
-                                seccao: e.target.value,
-                              })
-                            }
-                            disabled={false}
-                          >
-                            <option value="">Selecione...</option>
-                            {(
-                              SECTORES[
-                                selectedColaborador.reparticao as keyof typeof SECTORES
-                              ] || []
-                            )?.map((s) => (
-                              <option key={s + "-" + Math.random()} value={s}>
-                                {s}
-                              </option>
-                            ))}
-                            {/* Fallback fixed options if no sectors defined for reparticao */}
-                            {!SECTORES[
-                              selectedColaborador.reparticao as keyof typeof SECTORES
-                            ] && (
-                              <>
-                                <option value="Serviços Gerais">
-                                  Serviços Gerais
-                                </option>
-                                <option value="Administrativo">
-                                  Administrativo
-                                </option>
-                              </>
-                            )}
-                          </select>
-                        </div>
-                      </div>
-                    )}
-                  </div>
 
-                  {/* Secção 4: DADOS PROFISSIONAIS FORMÇÃO ACADÉMICA */}
-                  <div className="border border-black rounded-[2rem] p-8 space-y-6 relative">
-                    <div className="absolute -top-3 left-6 bg-white px-4 flex items-center gap-2">
-                      <div className="w-1 h-4 bg-blue-600 rounded-full"></div>
-                      <h3 className="text-[10px] font-black text-blue-900 tracking-[0.2em]">
-                        Dados Profissionais & Formação Académica
-                      </h3>
-                    </div>
-                    <div className="grid grid-cols-3 gap-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-end">
                       <div>
                         <label className="block text-[10px] font-bold text-gray-700 mb-1 tracking-tight">
-                          Função
+                          Repartição / Secção
                         </label>
                         <select
-                          className="w-full px-4 py-2 rounded-xl border border-gray-200 focus:ring-2 focus:ring-blue-500 transition-all outline-none bg-white font-medium h-11"
-                          value={selectedColaborador.funcao || ""}
-                          onChange={(e) =>
+                          className="w-full px-4 py-2.5 rounded-xl border border-gray-200 focus:ring-2 focus:ring-blue-500 transition-all outline-none bg-white font-medium h-11 text-sm"
+                          value={selectedColaborador.reparticao || ""}
+                          onChange={(e) => {
+                            const val = e.target.value;
                             setSelectedColaborador({
                               ...selectedColaborador,
-                              funcao: e.target.value,
-                            })
-                          }
+                              reparticao: val,
+                              seccao: "",
+                            });
+                          }}
                         >
                           <option value="">Selecione...</option>
-                          {LISTA_FUNCOES.map((f) => (
-                            <option key={f} value={f}>
-                              {f}
+                          {Array.from(
+                            new Set(
+                              selectedColaborador.departamento &&
+                                REPARTICOES[
+                                  selectedColaborador.departamento as keyof typeof REPARTICOES
+                                ]
+                                ? REPARTICOES[
+                                    selectedColaborador.departamento as keyof typeof REPARTICOES
+                                  ]
+                                : Object.values(REPARTICOES).flat(),
+                            ),
+                          ).map((r, idx) => (
+                            <option key={`${r}-${idx}`} value={r}>
+                              {r}
                             </option>
                           ))}
                         </select>
                       </div>
                       <div>
                         <label className="block text-[10px] font-bold text-gray-700 mb-1 tracking-tight">
-                          Efetivo
+                          Secção
                         </label>
                         <select
-                          className="w-full px-4 py-2 rounded-xl border border-gray-200 focus:ring-2 focus:ring-blue-500 transition-all outline-none bg-white font-medium h-11"
-                          value={selectedColaborador.efetivo ? "Sim" : "Não"}
+                          className="w-full px-4 py-2.5 rounded-xl border border-gray-200 focus:ring-2 focus:ring-blue-500 transition-all outline-none bg-white font-medium h-11 text-sm"
+                          value={selectedColaborador.seccao || ""}
                           onChange={(e) =>
                             setSelectedColaborador({
                               ...selectedColaborador,
-                              efetivo: e.target.value === "Sim",
+                              seccao: e.target.value,
                             })
                           }
                         >
-                          <option value="Sim">Sim</option>
-                          <option value="Não">Não</option>
+                          <option value="">Selecione...</option>
+                          {(
+                            SECTORES[
+                              selectedColaborador.reparticao as keyof typeof SECTORES
+                            ] || []
+                          )?.map((s) => (
+                            <option key={s} value={s}>
+                              {s}
+                            </option>
+                          ))}
+                          {!SECTORES[
+                            selectedColaborador.reparticao as keyof typeof SECTORES
+                          ] && (
+                            <>
+                              <option value="Serviços Gerais">
+                                Serviços Gerais
+                              </option>
+                              <option value="Administrativo">
+                                Administrativo
+                              </option>
+                            </>
+                          )}
+                        </select>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
+                      <div>
+                        <label className="block text-[10px] font-bold text-gray-700 mb-1 tracking-tight">
+                          Cargo
+                        </label>
+                        <select
+                          className="w-full px-4 py-2.5 rounded-xl border border-gray-200 focus:ring-2 focus:ring-blue-500 transition-all outline-none bg-white font-medium h-11 text-sm"
+                          value={selectedColaborador.cargo || ""}
+                          onChange={(e) => {
+                            const val = e.target.value;
+                            const updates: any = { cargo: val };
+                            if (
+                              val !== "" &&
+                              val !== "Nenhum" &&
+                              (selectedColaborador.estadoMandato === "Nenhum" ||
+                                !selectedColaborador.estadoMandato)
+                            ) {
+                              updates.estadoMandato = "Em Atividade";
+                            }
+                            setSelectedColaborador({
+                              ...selectedColaborador,
+                              ...updates,
+                            });
+                          }}
+                        >
+                          <option value="">Selecione...</option>
+                          {LISTA_CARGOS_CHEFIA.map((c) => (
+                            <option key={c} value={c}>
+                              {c}
+                            </option>
+                          ))}
                         </select>
                       </div>
                       <div>
                         <label className="block text-[10px] font-bold text-gray-700 mb-1 tracking-tight">
-                          Estado
+                          Data da Nomeação
+                        </label>
+                        <input
+                          type="date"
+                          className="w-full px-4 py-2.5 rounded-xl border border-gray-200 focus:ring-2 focus:ring-blue-500 transition-all outline-none font-medium h-11 text-sm"
+                          value={selectedColaborador.dataMandato || ""}
+                          onChange={(e) =>
+                            setSelectedColaborador({
+                              ...selectedColaborador,
+                              dataMandato: e.target.value,
+                            })
+                          }
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-[10px] font-bold text-gray-700 mb-1 tracking-tight">
+                          Data da Despromoção
+                        </label>
+                        <input
+                          type="date"
+                          className="w-full px-4 py-2.5 rounded-xl border border-gray-200 focus:ring-2 focus:ring-blue-500 transition-all outline-none font-medium h-11 text-sm"
+                          value={selectedColaborador.dataDespromocao || ""}
+                          onChange={(e) =>
+                            setSelectedColaborador({
+                              ...selectedColaborador,
+                              dataDespromocao: e.target.value,
+                            })
+                          }
+                        />
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-end">
+                      <div>
+                        <label className="block text-[10px] font-bold text-gray-700 mb-1 tracking-tight">
+                          Estado do Mandato
                         </label>
                         <select
-                          className={`w-full px-4 py-2 rounded-xl border border-gray-200 focus:ring-2 focus:ring-blue-500 transition-all outline-none bg-white font-black h-11 ${["Falecido", "Reformado", "Transferido"].includes(selectedColaborador.estado || "Ativo") ? "text-red-600" : selectedColaborador.estado === "Ativo" || !selectedColaborador.estado ? "text-green-600" : "text-blue-600"}`}
+                          className="w-full px-4 py-2.5 rounded-xl border border-gray-200 focus:ring-2 focus:ring-blue-500 transition-all outline-none bg-white font-bold h-11 text-sm text-red-600"
+                          value={
+                            selectedColaborador.estadoMandato === "em atividade"
+                              ? "Em Atividade"
+                              : selectedColaborador.estadoMandato ||
+                                "Em Atividade"
+                          }
+                          onChange={(e) =>
+                            setSelectedColaborador({
+                              ...selectedColaborador,
+                              estadoMandato: e.target.value as any,
+                            })
+                          }
+                        >
+                          <option value="Em Atividade">Em Atividade</option>
+                          <option value="Cessado">Cessado</option>
+                          <option value="Despromovido">Despromovido</option>
+                        </select>
+                      </div>
+                      <div>
+                        <label className="block text-[10px] font-bold text-gray-700 mb-1 tracking-tight">
+                          Estado do Colaborador
+                        </label>
+                        <select
+                          className={`w-full px-4 py-2.5 rounded-xl border border-gray-200 focus:ring-2 focus:ring-blue-500 transition-all outline-none bg-white font-bold h-11 text-sm ${["Falecido", "Reformado", "Transferido", "Inativo"].includes(selectedColaborador.estado || "Ativo") ? "text-red-600" : selectedColaborador.estado === "Ativo" || !selectedColaborador.estado ? "text-green-600" : "text-blue-600"}`}
                           value={selectedColaborador.estado || "Ativo"}
                           onChange={(e) =>
                             setSelectedColaborador({
@@ -6425,377 +6743,100 @@ export default function GestaoPessoalView({
                           <option value="Reformado">Reformado</option>
                           <option value="Transferido">Transferido</option>
                           <option value="Falecido">Falecido</option>
+                          <option value="Nenhum">Nenhum</option>
                         </select>
-                      </div>
-                    </div>
-                    <div className="grid grid-cols-2 gap-4">
-                      <div>
-                        <label className="block text-[10px] font-bold text-gray-700 mb-1 tracking-tight">
-                          Categoria
-                        </label>
-                        <select
-                          className="w-full px-4 py-2 rounded-xl border border-gray-200 focus:ring-2 focus:ring-blue-500 transition-all outline-none bg-white font-medium h-11"
-                          value={selectedColaborador.categoria || ""}
-                          onChange={(e) => {
-                            const val = e.target.value;
-                            const resolvedTipo = classifyTipo({
-                              categoria: val,
-                            });
-                            setSelectedColaborador({
-                              ...selectedColaborador,
-                              categoria: val,
-                              tipo: resolvedTipo as any,
-                              carreira: resolvedTipo,
-                            });
-                          }}
-                        >
-                          <option value="">Selecione...</option>
-                          {CATEGORIAS_FUNCIONARIOS.map((c) => (
-                            <option key={c} value={c}>
-                              {c}
-                            </option>
-                          ))}
-                        </select>
-                      </div>
-                      <div>
-                        <label className="block text-[10px] font-bold text-gray-700 mb-1 tracking-tight">
-                          Carreira
-                        </label>
-                        <select
-                          className="w-full px-4 py-2 rounded-xl border border-gray-200 focus:ring-2 focus:ring-blue-500 transition-all outline-none bg-white font-medium h-11"
-                          value={selectedColaborador.carreira || ""}
-                          onChange={(e) =>
-                            setSelectedColaborador({
-                              ...selectedColaborador,
-                              carreira: e.target.value,
-                            })
-                          }
-                        >
-                          <option value="">Selecione...</option>
-                          <option value="Docente">Docente</option>
-                          <option value="CTA">CTA</option>
-                          <option value="Investigador">Investigador</option>
-                        </select>
-                      </div>
-                    </div>
-                    <div className="grid grid-cols-3 gap-4">
-                      <div>
-                        <label className="block text-[10px] font-bold text-gray-700 mb-1 tracking-tight">
-                          Tipo de Contrato
-                        </label>
-                        <select
-                          className="w-full px-4 py-2 rounded-xl border border-gray-200 focus:ring-2 focus:ring-blue-500 transition-all outline-none bg-white font-medium h-11"
-                          value={selectedColaborador.tipoContrato || ""}
-                          onChange={(e) =>
-                            setSelectedColaborador({
-                              ...selectedColaborador,
-                              tipoContrato: e.target.value,
-                            })
-                          }
-                        >
-                          <option value="">Selecione...</option>
-                          <option value="Tempo inteiro">Tempo inteiro</option>
-                          <option value="Tempo Parcial">Tempo Parcial</option>
-                        </select>
-                      </div>
-                      <div>
-                        <label className="block text-[10px] font-bold text-gray-700 mb-1 tracking-tight">
-                          Vínculo Contratual
-                        </label>
-                        <select
-                          className="w-full px-4 py-2 rounded-xl border border-gray-200 focus:ring-2 focus:ring-blue-500 transition-all outline-none bg-white font-medium h-11"
-                          value={selectedColaborador.vinculoContractual || ""}
-                          onChange={(e) =>
-                            setSelectedColaborador({
-                              ...selectedColaborador,
-                              vinculoContractual: e.target.value,
-                            })
-                          }
-                        >
-                          <option value="">Selecione...</option>
-                          <option value="Nomeação Definitiva">
-                            Nomeação Definitiva
-                          </option>
-                          <option value="Nomeação definitiva">
-                            Nomeação definitiva
-                          </option>
-                          <option value="Nomeação Provisória">
-                            Nomeação Provisória
-                          </option>
-                          <option value="Nomeação provisória">
-                            Nomeação provisória
-                          </option>
-                          <option value="Contratado">Contratado</option>
-                          <option value="Quadro Efetivo">Quadro Efetivo</option>
-                          <option value="Pertence ao quadro">
-                            Pertence ao quadro
-                          </option>
-                          <option value="Não pertence ao quadro">
-                            Não pertence ao quadro
-                          </option>
-                          <option value="Difinitivo">Difinitivo</option>
-                          <option value="Definitivo">Definitivo</option>
-                          <option value="Reformado">Reformado</option>
-                          {selectedColaborador.vinculoContractual &&
-                            ![
-                              "",
-                              "Nomeação Definitiva",
-                              "Nomeação definitiva",
-                              "Nomeação Provisória",
-                              "Nomeação provisória",
-                              "Contratado",
-                              "Quadro Efetivo",
-                              "Pertence ao quadro",
-                              "Não pertence ao quadro",
-                              "Difinitivo",
-                              "Definitivo",
-                              "Reformado",
-                            ].includes(
-                              selectedColaborador.vinculoContractual,
-                            ) && (
-                              <option
-                                value={selectedColaborador.vinculoContractual}
-                              >
-                                {selectedColaborador.vinculoContractual}
-                              </option>
-                            )}
-                        </select>
-                      </div>
-                      <div>
-                        <label className="block text-[10px] font-bold text-gray-700 mb-1 tracking-tight">
-                          Data de Admissão
-                        </label>
-                        <input
-                          type="date"
-                          className="w-full px-4 py-2 rounded-xl border border-gray-200 focus:ring-2 focus:ring-blue-500 transition-all outline-none font-medium h-11"
-                          value={selectedColaborador.dataAdmissao || ""}
-                          onChange={(e) =>
-                            setSelectedColaborador({
-                              ...selectedColaborador,
-                              dataAdmissao: e.target.value,
-                            })
-                          }
-                        />
-                      </div>
-                    </div>
-                    <div className="grid grid-cols-2 gap-4">
-                      <div>
-                        <label className="block text-[10px] font-bold text-gray-700 mb-1 tracking-tight">
-                          Nível Académico
-                        </label>
-                        <select
-                          className="w-full px-4 py-2 rounded-xl border border-gray-200 focus:ring-2 focus:ring-blue-500 transition-all outline-none bg-white font-medium h-11"
-                          value={selectedColaborador.nivelAcademico || ""}
-                          onChange={(e) =>
-                            setSelectedColaborador({
-                              ...selectedColaborador,
-                              nivelAcademico: e.target.value,
-                            })
-                          }
-                        >
-                          <option value="">Selecione...</option>
-                          {NIVEIS_ACADEMICOS.map((n) => (
-                            <option key={n} value={n}>
-                              {n}
-                            </option>
-                          ))}
-                        </select>
-                      </div>
-                      <div>
-                        <label className="block text-[10px] font-bold text-gray-700 mb-1 tracking-tight text-right">
-                          Área de Formação
-                        </label>
-                        <input
-                          type="text"
-                          className="w-full px-4 py-2 rounded-xl border border-gray-200 focus:ring-2 focus:ring-blue-500 transition-all outline-none font-medium h-11"
-                          value={selectedColaborador.areaFormacao || "Geral"}
-                          onChange={(e) =>
-                            setSelectedColaborador({
-                              ...selectedColaborador,
-                              areaFormacao: e.target.value,
-                            })
-                          }
-                        />
                       </div>
                     </div>
 
-                    {selectedColaborador.tipo === "Docente" && (
-                      <div className="space-y-4">
-                        <label className="block text-[10px] font-black text-blue-900 tracking-widest uppercase">
-                          Disciplinas Leccionadas (Até 4)
-                        </label>
-                        <div className="grid grid-cols-2 gap-4">
-                          {[0, 1, 2, 3].map((idx) => {
-                            const discList =
-                              selectedColaborador.disciplinas || [
-                                "",
-                                "",
-                                "",
-                                "",
-                              ];
-                            return (
-                              <div key={idx}>
-                                <label className="block text-[9px] font-bold text-gray-500 mb-1 uppercase">
-                                  Disciplina {idx + 1}
-                                </label>
-                                <input
-                                  type="text"
-                                  className="w-full px-4 py-2 rounded-xl border border-gray-200 focus:ring-2 focus:ring-blue-500 transition-all outline-none font-medium h-11"
-                                  placeholder={`Disciplina ${idx + 1}`}
-                                  value={discList[idx] || ""}
-                                  onChange={(e) => {
-                                    const newList = [...discList];
-                                    newList[idx] = e.target.value;
-                                    setSelectedColaborador({
-                                      ...selectedColaborador,
-                                      disciplinas: newList,
-                                    });
-                                  }}
-                                />
-                              </div>
-                            );
-                          })}
+                    {/* 4 CAMPOS DE SETORES DE TRABALHO PARA TÉCNICO DO SETOR */}
+                    {(selectedColaborador.cargo === "Técnico do Setor" ||
+                      selectedColaborador.cargoChefia === "Técnico do Setor" ||
+                      (selectedColaborador.cargo || "").toLowerCase().includes("tecnico do setor") ||
+                      (selectedColaborador.cargo || "").toLowerCase().includes("técnico do setor") ||
+                      (selectedColaborador.cargo || "").toLowerCase().includes("tecnico do sector") ||
+                      (selectedColaborador.cargo || "").toLowerCase().includes("técnico do sector")) && (
+                      <div className="mt-4 p-4 bg-blue-50/60 rounded-2xl border border-blue-200/80 space-y-3">
+                        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-blue-200/60 pb-2">
+                          <div>
+                            <span className="text-xs font-black text-blue-900 uppercase tracking-wide flex items-center gap-1.5">
+                              <span className="w-2 h-2 rounded-full bg-blue-600"></span>
+                              Setores de Trabalho do Técnico (Até 4)
+                            </span>
+                            <p className="text-[10px] text-blue-700 font-medium">
+                              Setores alocados ao departamento afetado: <strong className="text-blue-950">{selectedColaborador.departamento || "Não selecionado"}</strong>
+                            </p>
+                          </div>
                         </div>
+
+                        {(() => {
+                          const deptSectors = getSetoresByDepartamento(selectedColaborador.departamento);
+                          const currentSectors = selectedColaborador.setoresAtribuidos || [
+                            selectedColaborador.sector || "",
+                            "",
+                            "",
+                            "",
+                          ];
+
+                          const handleSectorChange = (idx: number, val: string) => {
+                            const updated = [...currentSectors];
+                            while (updated.length < 4) updated.push("");
+                            updated[idx] = val;
+                            setSelectedColaborador({
+                              ...selectedColaborador,
+                              setoresAtribuidos: updated,
+                              sector: updated[0] || selectedColaborador.sector || "",
+                            });
+                          };
+
+                          return (
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pt-1">
+                              {[0, 1, 2, 3].map((idx) => (
+                                <div key={idx} className="space-y-1">
+                                  <label className="block text-[10px] font-bold text-gray-700 uppercase tracking-tight">
+                                    Setor {idx + 1}
+                                  </label>
+                                  <div className="relative">
+                                    <input
+                                      type="text"
+                                      list={`gp-dept-sectors-${idx}`}
+                                      className="w-full px-3.5 py-2 rounded-xl border border-gray-300 focus:ring-2 focus:ring-blue-500 transition-all outline-none font-medium h-10 text-sm bg-white"
+                                      placeholder={
+                                        deptSectors.length > 0
+                                          ? `Selecione ou digite o setor ${idx + 1}...`
+                                          : `Setor ${idx + 1}...`
+                                      }
+                                      value={currentSectors[idx] || ""}
+                                      onChange={(e) => handleSectorChange(idx, e.target.value)}
+                                    />
+                                    <datalist id={`gp-dept-sectors-${idx}`}>
+                                      {deptSectors.map((s, sIdx) => (
+                                        <option key={`${s}-${sIdx}`} value={s}>
+                                          {s}
+                                        </option>
+                                      ))}
+                                    </datalist>
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          );
+                        })()}
                       </div>
                     )}
                   </div>
                 </fieldset>
 
-                {/* Secção 5: CARGO DE CHEFIA E CONFIANÇAS */}
-                <div className="border border-black rounded-[2rem] p-8 space-y-6 relative">
-                  <div className="absolute -top-3 left-6 bg-white px-4 flex items-center gap-2">
-                    <div className="w-1 h-4 bg-blue-600 rounded-full"></div>
-                    <h3 className="text-[10px] font-black text-blue-900 tracking-[0.2em]">
-                      Cargo de Chefia e Confianças
-                    </h3>
-                  </div>
-                  <div className="grid grid-cols-4 gap-4">
-                    <div className="col-span-2">
-                      <label className="block text-[10px] font-bold text-gray-700 mb-1 tracking-tight">
-                        Cargo
-                      </label>
-                      <select
-                        className="w-full px-4 py-2 rounded-xl border border-gray-200 focus:ring-2 focus:ring-blue-500 transition-all outline-none bg-white font-medium h-11"
-                        value={selectedColaborador.cargo || ""}
-                        onChange={(e) => {
-                          const val = e.target.value;
-                          const updates: any = { cargo: val };
-                          if (
-                            val !== "" &&
-                            val !== "Nenhum" &&
-                            (selectedColaborador.estadoMandato === "Nenhum" ||
-                              !selectedColaborador.estadoMandato)
-                          ) {
-                            updates.estadoMandato = "Em Atividade";
-                          }
-                          setSelectedColaborador({
-                            ...selectedColaborador,
-                            ...updates,
-                          });
-                        }}
-                      >
-                        <option value="">Selecione...</option>
-                        {LISTA_CARGOS_CHEFIA.map((c) => (
-                          <option key={c} value={c}>
-                            {c}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-                    <div>
-                      <label className="block text-[10px] font-bold text-gray-700 mb-1 tracking-tight">
-                        Data da Nomeação
-                      </label>
-                      <input
-                        type="date"
-                        className="w-full px-4 py-2 rounded-xl border border-gray-200 focus:ring-2 focus:ring-blue-500 transition-all outline-none font-medium h-11"
-                        value={selectedColaborador.dataMandato || ""}
-                        onChange={(e) =>
-                          setSelectedColaborador({
-                            ...selectedColaborador,
-                            dataMandato: e.target.value,
-                          })
-                        }
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-[10px] font-bold text-gray-700 mb-1 tracking-tight">
-                        Data da Despromoção
-                      </label>
-                      <input
-                        type="date"
-                        className="w-full px-4 py-2 rounded-xl border border-gray-200 focus:ring-2 focus:ring-blue-500 transition-all outline-none font-medium h-11"
-                        value={selectedColaborador.dataDespromocao || ""}
-                        onChange={(e) =>
-                          setSelectedColaborador({
-                            ...selectedColaborador,
-                            dataDespromocao: e.target.value,
-                          })
-                        }
-                      />
-                    </div>
-                    <div className="col-span-2">
-                      <label className="block text-[10px] font-bold text-gray-700 mb-1 tracking-tight">
-                        Estado do Mandato
-                      </label>
-                      <select
-                        className="w-full px-4 py-2 rounded-xl border border-gray-200 focus:ring-2 focus:ring-blue-500 transition-all outline-none bg-white font-black h-11 text-red-600"
-                        value={
-                          selectedColaborador.estadoMandato === "em atividade"
-                            ? "Em Atividade"
-                            : selectedColaborador.estadoMandato ||
-                              "Em Atividade"
-                        }
-                        onChange={(e) =>
-                          setSelectedColaborador({
-                            ...selectedColaborador,
-                            estadoMandato: e.target.value as any,
-                          })
-                        }
-                      >
-                        <option value="Em Atividade">Em Atividade</option>
-                        <option value="Cessado">Cessado</option>
-                        <option value="Despromovido">Despromovido</option>
-                      </select>
-                    </div>
-                    <div className="col-span-2">
-                      <label className="block text-[10px] font-bold text-gray-700 mb-1 tracking-tight">
-                        Estado do Colaborador
-                      </label>
-                      <select
-                        className={`w-full px-4 py-2 rounded-xl border border-gray-200 focus:ring-2 focus:ring-blue-500 transition-all outline-none bg-white font-black h-11 ${["Falecido", "Reformado", "Transferido"].includes(selectedColaborador.estado || "Ativo") ? "text-red-600" : selectedColaborador.estado === "Ativo" || !selectedColaborador.estado ? "text-green-600" : "text-blue-600"}`}
-                        value={selectedColaborador.estado || "Ativo"}
-                        onChange={(e) =>
-                          setSelectedColaborador({
-                            ...selectedColaborador,
-                            estado: e.target.value,
-                          })
-                        }
-                      >
-                        <option value="Ativo">Ativo</option>
-                        <option value="Inativo">Inativo</option>
-                        <option value="Aposentado">Aposentado</option>
-                        <option value="Licença">Licença</option>
-                        <option value="Reformado">Reformado</option>
-                        <option value="Transferido">Transferido</option>
-                        <option value="Falecido">Falecido</option>
-                        <option value="Nenhum">Nenhum</option>
-                      </select>
-                    </div>
-                  </div>
-                </div>
-
                 <div className="flex justify-end gap-4 mt-8">
                   <button
                     type="button"
                     onClick={popView}
-                    className="px-8 py-3 rounded-xl border border-gray-200 text-gray-600 font-bold hover:bg-gray-50 transition-all"
+                    className="px-8 py-3 rounded-2xl border border-gray-200 text-gray-700 font-bold hover:bg-gray-50 transition-all text-sm shadow-xs"
                   >
                     Cancelar
                   </button>
                   <button
                     type="submit"
-                    className="px-8 py-3 rounded-xl bg-blue-600 text-white font-bold hover:bg-blue-700 shadow-lg shadow-blue-200 transition-all"
+                    className="px-8 py-3 rounded-2xl bg-[#1d63ff] hover:bg-blue-700 text-white font-bold transition-all text-sm shadow-lg shadow-blue-500/25"
                   >
                     Guardar Alterações
                   </button>
