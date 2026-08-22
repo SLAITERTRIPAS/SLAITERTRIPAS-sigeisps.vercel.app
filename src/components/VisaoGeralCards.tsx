@@ -1,5 +1,5 @@
 import React from "react";
-import { Users, FileText, BarChart3, DollarSign, GraduationCap, FolderOpen, FileCheck } from "lucide-react";
+import { Users, FileText, BarChart3, DollarSign, GraduationCap, FolderOpen, FileCheck, Box } from "lucide-react";
 
 interface CardItem {
   title: string;
@@ -18,6 +18,8 @@ export default function VisaoGeralCards({
   user: any;
   title: string;
 }) {
+  const isUGEA = title === "Unidade Gestora e Executora de Aquisições";
+
   const getCardDetails = (cardTitle: string): CardItem => {
     const upper = cardTitle.toUpperCase();
     
@@ -28,7 +30,47 @@ export default function VisaoGeralCards({
     if (upper === "RECURSOS FINANCEIROS") target = "Balanço";
     if (upper === "CORPO DISCENTE") target = "Gestão Académica";
     if (upper === "GESTÃO DE EXPEDIENTE") target = "Gestão de Expediente";
+    if (upper === "GESTÃO DE PRODUTOS E PREÇOS") target = "Gestão de Produtos e Preços";
+    if (upper === "GESTÃO DE FORNECEDORES") target = "Gestão de Fornecedores";
+    if (upper === "PLANO DE AQUISIÇÃO") target = "Plano de Aquisição";
+    if (upper === "PLANO DE CONTRATAÇÃO") target = "Plano de Contratação";
 
+    if (upper.includes("PRODUTOS") || upper.includes("PREÇOS")) {
+      return {
+        title: cardTitle,
+        sub: "Catálogo de Produtos, Preços e Materiais da UGEA",
+        icon: Box,
+        color: "border-indigo-900 bg-indigo-50/30 text-indigo-950 hover:bg-indigo-50",
+        target,
+      };
+    }
+    if (upper.includes("FORNECEDORES")) {
+      return {
+        title: cardTitle,
+        sub: "Registo e Gestão Oficial de Fornecedores",
+        icon: Users,
+        color: "border-blue-900 bg-blue-50/30 text-blue-950 hover:bg-blue-50",
+        target,
+      };
+    }
+    if (upper.includes("AQUISIÇÃO")) {
+      return {
+        title: cardTitle,
+        sub: "Planificação e Controlo de Aquisições",
+        icon: FileText,
+        color: "border-emerald-900 bg-emerald-50/30 text-emerald-950 hover:bg-emerald-50",
+        target,
+      };
+    }
+    if (upper.includes("CONTRATAÇÃO")) {
+      return {
+        title: cardTitle,
+        sub: "Planificação e Contratação de Serviços",
+        icon: FileText,
+        color: "border-purple-900 bg-purple-50/30 text-purple-950 hover:bg-purple-50",
+        target,
+      };
+    }
     if (upper.includes("EFETIVO")) {
       return {
         title: cardTitle,
@@ -101,7 +143,14 @@ export default function VisaoGeralCards({
     };
   };
 
-  const rawCards = [
+  const rawCards = isUGEA ? [
+    "GESTÃO DE PRODUTOS E PREÇOS",
+    "GESTÃO DE FORNECEDORES",
+    "PLANO DE AQUISIÇÃO",
+    "PLANO DE CONTRATAÇÃO",
+    "PLANOS DE ATIVIDADES",
+    "GESTÃO DE EXPEDIENTE",
+  ] : [
     "EFETIVO GERAL",
     "PLANOS DE ATIVIDADES",
     "RELATÓRIOS",

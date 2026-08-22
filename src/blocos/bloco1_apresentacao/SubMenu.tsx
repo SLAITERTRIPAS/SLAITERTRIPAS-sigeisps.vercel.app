@@ -18,6 +18,105 @@ import ArchiveView from "../bloco5_sistema/ArchiveView";
 import { LibraryRegistration, BookRegistration } from "../../types";
 import { isSuperBossUser, isPatrimonioBossOrAdmin } from "../../lib/auth";
 import MainHeader from "../bloco1_apresentacao/MainHeader";
+import { UNIDADES_ORGANICAS_SISTEMA, DEPARTAMENTOS } from "../../constants/formOptions";
+
+const getActivityValue = (act: any) => {
+  let actVal = 0;
+  let hasRub = false;
+  if (Array.isArray(act.rubricas) && act.rubricas.length > 0) {
+    const rSum = act.rubricas.reduce(
+      (acc: number, r: any) =>
+        acc + Number(r.valorTotal || r.total || r.valor || r.precoTotal || 0),
+      0
+    );
+    if (rSum > 0) {
+      actVal += rSum;
+      hasRub = true;
+    }
+  }
+  if (!hasRub) {
+    actVal += Number(
+      act.valor ||
+        act.orcamentoTotal ||
+        act.valorTotal ||
+        act.orcamento ||
+        act.custoTotal ||
+        0
+    );
+  }
+  return actVal;
+};
+
+const calculateScopeBudget = (currentTitle: string, activities: any[]) => {
+  const titleUpper = (currentTitle || "").trim().toUpperCase();
+
+  if (
+    !currentTitle ||
+    titleUpper.includes("SELECIONE A ÁREA") ||
+    titleUpper.includes("CURSOS") ||
+    titleUpper === "MENU PRINCIPAL" ||
+    titleUpper === "INSTITUCIONAL"
+  ) {
+    return activities.reduce((sum, act) => sum + getActivityValue(act), 0);
+  }
+
+  const matchedOrgan = UNIDADES_ORGANICAS_SISTEMA.find(
+    (u) => u.nome.toUpperCase() === titleUpper || u.id.toUpperCase() === titleUpper
+  );
+
+  if (matchedOrgan) {
+    return activities.reduce((sum, act) => {
+      const actDir = (act.direcao || act.direccao || act.unidadeOrganica || "").trim().toUpperCase();
+      const actDept = (act.departamento || act.unidade || act.solicitante || "").trim().toUpperCase();
+      const actOrg = (act.orgao || "").trim().toUpperCase();
+
+      const belongsToOrgan = matchedOrgan.direcoes.some((dir) => {
+        const dirUp = dir.toUpperCase();
+        if (actDir === dirUp || actOrg === dirUp) return true;
+        const subDepts = DEPARTAMENTOS[dir] || [];
+        if (subDepts.some(sd => sd.toUpperCase() === actDept)) return true;
+        return false;
+      });
+
+      return belongsToOrgan ? sum + getActivityValue(act) : sum;
+    }, 0);
+  }
+
+  const matchedDeptKey = Object.keys(DEPARTAMENTOS).find(
+    (k) => k.toUpperCase() === titleUpper
+  );
+
+  if (matchedDeptKey) {
+    const subDepts = DEPARTAMENTOS[matchedDeptKey] || [matchedDeptKey];
+    return activities.reduce((sum, act) => {
+      const actDir = (act.direcao || act.direccao || act.unidadeOrganica || "").trim().toUpperCase();
+      const actDept = (act.departamento || act.unidade || act.solicitante || act.orgao || "").trim().toUpperCase();
+
+      const matches =
+        actDir === titleUpper ||
+        actDept === titleUpper ||
+        actDir === matchedDeptKey.toUpperCase() ||
+        subDepts.some((sd) => sd.toUpperCase() === actDept || sd.toUpperCase() === actDir);
+
+      return matches ? sum + getActivityValue(act) : sum;
+    }, 0);
+  }
+
+  // Strict exact matching for specific sector/department/reparticao without loose substring matches
+  return activities.reduce((sum, act) => {
+    const actDir = (act.direcao || act.direccao || act.unidadeOrganica || "").trim().toUpperCase();
+    const actDept = (act.departamento || act.unidade || act.solicitante || act.orgao || act.setor || act.reparticao || "").trim().toUpperCase();
+
+    const matches =
+      actDir === titleUpper ||
+      actDept === titleUpper ||
+      act.solicitante?.trim().toUpperCase() === titleUpper ||
+      act.setor?.trim().toUpperCase() === titleUpper ||
+      act.reparticao?.trim().toUpperCase() === titleUpper;
+
+    return matches ? sum + getActivityValue(act) : sum;
+  }, 0);
+};
 
 export default function SubMenu({
   title,
@@ -77,10 +176,7 @@ export default function SubMenu({
   const [showArchiveView, setShowArchiveView] = useState(false);
 
   const totalActivitiesCount = matrixActivities.length;
-  const totalBudgetAmount = matrixActivities.reduce(
-    (sum, act) => sum + Number(act.valorTotal || act.valor || 0),
-    0
-  );
+  const totalBudgetAmount = calculateScopeBudget(title, matrixActivities);
   const formattedBudget =
     totalBudgetAmount.toLocaleString("pt-MZ", {
       minimumFractionDigits: 2,
@@ -394,65 +490,79 @@ export default function SubMenu({
 
         {/* Menu Grid Items - Adaptable layout centering items properly based on count */}
         <div className={`grid gap-4 sm:gap-6 w-full mx-auto ${gridClass} ${maxWidthClass}`}>
-          {displayItems.map((item, index) => (
-            <button
-              key={index}
-              onClick={async () => {
-                if (!isAllowed(item)) {
-                  onShowAlert("Área não acessível ao seu perfil.");
-                  try {
-                    const { firestoreService } =
-                      await import("../../lib/firestoreService");
-                    await firestoreService.accessAlerts.add({
-                      userName: user?.name || user?.email || "Desconhecido",
-                      userEmail: user?.email || "",
-                      userRole: user?.role || "",
-                      userNuit: user?.nuit || "",
-                      targetSector: item.title,
-                      timestamp: new Date().toISOString(),
-                    });
-                  } catch (e) {}
-                  return;
-                }
-                if (item.title === "Registos de Visitantes") {
-                  setShowLibraryVisitForm(true);
-                } else if (item.title === "Registo de Obras e Livros") {
-                  setShowBookRegistrationForm(true);
-                } else if (item.title === "Repartição de Arquivo") {
-                  setShowArchiveView(true);
-                } else if (item.subItems && item.subItems.length > 0) {
-                  onNavigate?.(item.title, item.subItems);
-                } else {
-                  onNavigate?.(item.title, []);
-                }
-              }}
-              className={`${isServicosCentrais ? 'bg-[#5842ff] min-h-[220px] p-8 rounded-3xl flex flex-col items-center justify-between text-center shadow-xl hover:scale-[1.02] transition-all cursor-pointer text-white' : `${colors[index % colors.length]} w-full text-white p-3 sm:p-4 lg:p-5 rounded-xl sm:rounded-[1.5rem] flex sm:flex-col items-center justify-between sm:justify-center gap-2 sm:gap-3 lg:gap-4 min-h-[3rem] sm:min-h-[6rem] lg:min-h-[8rem] shadow-lg hover:shadow-xl active:scale-[0.98] touch-manipulation transition-all duration-200 cursor-pointer text-left sm:text-center ${!isAllowed(item) ? "opacity-50 grayscale cursor-not-allowed" : ""}`}`}
-            >
-              <span
-                className={`font-black font-serif tracking-tight leading-snug uppercase ${isServicosCentrais ? 'text-white text-sm sm:text-base my-auto' : 'flex-1 text-xs sm:text-sm lg:text-base'}`}
+          {displayItems.map((item, index) => {
+            const itemBudget = calculateScopeBudget(item.title, matrixActivities);
+            const formattedItemBudget = itemBudget.toLocaleString("pt-MZ", {
+              minimumFractionDigits: 2,
+              maximumFractionDigits: 2,
+            }) + " MZN";
+            return (
+              <button
+                key={index}
+                onClick={async () => {
+                  if (!isAllowed(item)) {
+                    onShowAlert("Área não acessível ao seu perfil.");
+                    try {
+                      const { firestoreService } =
+                        await import("../../lib/firestoreService");
+                      await firestoreService.accessAlerts.add({
+                        userName: user?.name || user?.email || "Desconhecido",
+                        userEmail: user?.email || "",
+                        userRole: user?.role || "",
+                        userNuit: user?.nuit || "",
+                        targetSector: item.title,
+                        timestamp: new Date().toISOString(),
+                      });
+                    } catch (e) {}
+                    return;
+                  }
+                  if (item.title === "Registos de Visitantes") {
+                    setShowLibraryVisitForm(true);
+                  } else if (item.title === "Registo de Obras e Livros") {
+                    setShowBookRegistrationForm(true);
+                  } else if (item.title === "Repartição de Arquivo") {
+                    setShowArchiveView(true);
+                  } else if (item.subItems && item.subItems.length > 0) {
+                    onNavigate?.(item.title, item.subItems);
+                  } else {
+                    onNavigate?.(item.title, []);
+                  }
+                }}
+                className={`${isServicosCentrais ? 'bg-[#5842ff] min-h-[220px] p-8 rounded-3xl flex flex-col items-center justify-between text-center shadow-xl hover:scale-[1.02] transition-all cursor-pointer text-white' : `${colors[index % colors.length]} w-full text-white p-3 sm:p-4 lg:p-5 rounded-xl sm:rounded-[1.5rem] flex sm:flex-col items-center justify-between sm:justify-center gap-2 sm:gap-3 lg:gap-4 min-h-[3rem] sm:min-h-[6rem] lg:min-h-[8rem] shadow-lg hover:shadow-xl active:scale-[0.98] touch-manipulation transition-all duration-200 cursor-pointer text-left sm:text-center ${!isAllowed(item) ? "opacity-50 grayscale cursor-not-allowed" : ""}`}`}
               >
-                {item.title}
-              </span>
-              <div className="flex items-center justify-center opacity-90 shrink-0 mt-4">
-                {isServicosCentrais ? (
-                  <div className="w-10 h-10 rounded-full bg-white/20 flex items-center justify-center text-white font-black">
-                    <ChevronRight size={22} />
+                <span
+                  className={`font-black font-serif tracking-tight leading-snug uppercase ${isServicosCentrais ? 'text-white text-sm sm:text-base' : 'flex-1 text-xs sm:text-sm lg:text-base'}`}
+                >
+                  {item.title}
+                </span>
+                
+                {itemBudget > 0 && (
+                  <div className="bg-black/20 backdrop-blur-xs text-amber-300 font-extrabold text-[10px] sm:text-xs px-2.5 py-1 rounded-md border border-white/10 my-1">
+                    Orçamento: {formattedItemBudget}
                   </div>
-                ) : item.subItems && item.subItems.length > 0 ? (
-                  <ChevronRight
-                    size={18}
-                    className="sm:w-5 sm:h-5 lg:w-6 lg:h-6"
-                  />
-                ) : (
-                  <span
-                    className="font-bold bg-white/20 px-2 py-0.5 rounded-md text-[8px] sm:text-[9px]"
-                  >
-                    Aceder
-                  </span>
                 )}
-              </div>
-            </button>
-          ))}
+
+                <div className="flex items-center justify-center opacity-90 shrink-0 mt-2">
+                  {isServicosCentrais ? (
+                    <div className="w-10 h-10 rounded-full bg-white/20 flex items-center justify-center text-white font-black">
+                      <ChevronRight size={22} />
+                    </div>
+                  ) : item.subItems && item.subItems.length > 0 ? (
+                    <ChevronRight
+                      size={18}
+                      className="sm:w-5 sm:h-5 lg:w-6 lg:h-6"
+                    />
+                  ) : (
+                    <span
+                      className="font-bold bg-white/20 px-2 py-0.5 rounded-md text-[8px] sm:text-[9px]"
+                    >
+                      Aceder
+                    </span>
+                  )}
+                </div>
+              </button>
+            );
+          })}
         </div>
       </main>
     </div>

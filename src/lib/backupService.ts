@@ -5,6 +5,7 @@ import {
   getDocs,
   doc,
   setDoc,
+  deleteDoc,
   writeBatch,
 } from "firebase/firestore";
 import { REPARTICOES, SECTORES, DEPARTAMENTOS } from "../constants/formOptions";
@@ -293,6 +294,9 @@ export async function collectAllBackupData(
   const organStats: Record<string, number> = {};
   let totalRecords = 0;
 
+  // Excluir coleções de configuração técnica do sistema para garantir que o backup é estritamente para dados
+  const EXCLUDED_SYSTEM_COLLS = ["configuracoes", "config_sistema", "drafts"];
+
   let organIndex = 0;
   const totalOrgans = SYSTEM_ORGAOS.length;
 
@@ -300,7 +304,7 @@ export async function collectAllBackupData(
     organIndex++;
     organStats[organ.id] = 0;
 
-    const organProgressMsg = `[Órgão ${organIndex}/${totalOrgans}] ${organ.name}: A recolher dados...`;
+    const organProgressMsg = `[Órgão ${organIndex}/${totalOrgans}] ${organ.name}: A recolher dados... (${totalRecords} registos até agora)`;
     if (onProgress) onProgress(organProgressMsg);
     dispatchBackupAlert({
       status: "in_progress",
@@ -310,6 +314,7 @@ export async function collectAllBackupData(
     });
 
     for (const collName of organ.collections) {
+      if (EXCLUDED_SYSTEM_COLLS.includes(collName)) continue;
       try {
         let docs: BackupDocument[] = [];
         if (db) {
@@ -351,6 +356,9 @@ export async function collectAllBackupData(
           stats[collName] = docs.length;
           organStats[organ.id] += docs.length;
           totalRecords += docs.length;
+
+          const collProgressMsg = `[Órgão ${organIndex}/${totalOrgans}] ${organ.name} › ${collName}: ${docs.length} registos recolhidos (Total acumulado: ${totalRecords} registos)`;
+          if (onProgress) onProgress(collProgressMsg);
         }
       } catch (err: any) {
         console.error(`Erro ao exportar coleção ${collName} do órgão ${organ.name}:`, err);
@@ -359,29 +367,14 @@ export async function collectAllBackupData(
     }
   }
 
-  // Guardar chaves do LocalStorage auxiliares
+  // Guardar apenas chaves de dados do LocalStorage (excluindo configurações do sistema)
   try {
-    const allLocalKeys: Record<string, any> = {};
-    for (let i = 0; i < localStorage.length; i++) {
-      const k = localStorage.key(i);
-      if (k && (k.startsWith("sigep_") || k.startsWith("proprietario") || k.startsWith("mono_") || k.startsWith("it") || k.startsWith("config_"))) {
-        try {
-          const val = localStorage.getItem(k);
-          if (val) {
-            allLocalKeys[k] = JSON.parse(val);
-          }
-        } catch (e) {
-          allLocalKeys[k] = localStorage.getItem(k);
-        }
-      }
-    }
-    backupData["_localStorage_all_keys"] = allLocalKeys;
     const productsVal = localStorage.getItem("sigep_unified_products");
     if (productsVal) backupData["_localStorage_sigep_unified_products"] = JSON.parse(productsVal);
     const deletedProdsVal = localStorage.getItem("sigep_deleted_products");
     if (deletedProdsVal) backupData["_localStorage_sigep_deleted_products"] = JSON.parse(deletedProdsVal);
   } catch (e) {
-    console.error("Erro ao exportar chaves do LocalStorage:", e);
+    console.error("Erro ao exportar chaves de dados do LocalStorage:", e);
   }
 
   // Estrutura hierárquica complementar por Unidades
@@ -521,12 +514,31 @@ export async function exportFullBackup(
  * Restaura exclusivamente os DADOS de utilizador para o Firestore e LocalStorage por Órgão.
  */
 export async function restoreFullBackup(
-  data: BackupData,
+  rawInputData: BackupData | any[],
   onProgress?: (msg: string) => void,
 ): Promise<{ totalRestored: number; restoredStats: Record<string, number>; organStats: Record<string, number> }> {
   let totalRestored = 0;
   const restoredStats: Record<string, number> = {};
   const organStats: Record<string, number> = {};
+
+  // Normalizar payload (suporte a formato array direto ou objeto de coleções)
+  let data: BackupData = {};
+  if (Array.isArray(rawInputData)) {
+    const sample = rawInputData[0] || {};
+    let targetColl = "matrix_activities";
+    if (sample.nuit || sample.categoriaProfissional || sample.apelido || sample.nomeCompleto) {
+      targetColl = "colaboradores";
+    } else if (sample.email || sample.passwordHash) {
+      targetColl = "users";
+    } else if (sample.fornecedor || sample.precoUnitario || sample.produto) {
+      targetColl = "produtosUnificados";
+    } else if (sample.titulo || sample.descricaoAtividade) {
+      targetColl = "actividades";
+    }
+    data = { [targetColl]: rawInputData };
+  } else if (rawInputData && typeof rawInputData === "object") {
+    data = rawInputData;
+  }
 
   localStorage.removeItem("sigep_quota_exceeded");
 
@@ -591,8 +603,8 @@ export async function restoreFullBackup(
       let docs: BackupDocument[] = [];
       for (const [key, value] of Object.entries(data)) {
         if (key.startsWith("_localStorage_") || key.startsWith("_metadata_")) continue;
-        const normalized = COLLECTION_ALIASES[key] || key;
-        if (normalized === collName && Array.isArray(value)) {
+        const normalized = COLLECTION_ALIASES[key] || COLLECTION_ALIASES[key.toLowerCase()] || COLLECTION_ALIASES[key.charAt(0).toUpperCase() + key.slice(1).toLowerCase()] || key.toLowerCase();
+        if ((normalized === collName || key.toLowerCase() === collName.toLowerCase()) && Array.isArray(value)) {
           docs = docs.concat(value);
         }
       }
@@ -691,6 +703,9 @@ export async function restoreFullBackup(
 
       restoredStats[collName] = (restoredStats[collName] || 0) + collCount;
       organStats[organ.id] += collCount;
+
+      const restoreLiveMsg = `[Órgão ${organRestoredIndex}/${totalOrgans}] ${organ.name} › ${collName}: ${collCount} registos restaurados (Total acumulado: ${totalRestored} registos)`;
+      if (onProgress) onProgress(restoreLiveMsg);
     }
   }
 
@@ -897,6 +912,20 @@ export async function getStoredBackupsList(): Promise<SystemBackupRecord[]> {
 }
 
 /**
+ * Exclui permanentemente um backup guardado no sistema
+ */
+export async function deleteStoredBackup(backupId: string): Promise<boolean> {
+  if (!db) return false;
+  try {
+    await deleteDoc(doc(db, "system_backups", backupId));
+    return true;
+  } catch (error) {
+    console.error("Erro ao excluir backup:", error);
+    return false;
+  }
+}
+
+/**
  * Faz o download do ficheiro JSON de um backup armazenado no sistema
  */
 export function downloadStoredBackupFile(record: SystemBackupRecord) {
@@ -916,5 +945,288 @@ export function downloadStoredBackupFile(record: SystemBackupRecord) {
   document.body.removeChild(link);
 
   setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+function getLoggedInUser(): any {
+  try {
+    const userStr = localStorage.getItem("sigep_logged_in_user") || localStorage.getItem("sigep_user");
+    if (userStr) return JSON.parse(userStr);
+  } catch (e) {}
+  return null;
+}
+
+function isUserAdmin(user: any): boolean {
+  if (!user) return true;
+  const email = String(user.email || "").toLowerCase().trim();
+  if (email === "slaitertripas@gmail.com") return true;
+  const role = String(user.role || "").toLowerCase();
+  if (role.includes("admin") || role.includes("diretor-geral") || role.includes("diretor geral")) return true;
+  return false;
+}
+
+/**
+ * Funções Independentes para Backup e Restauração de DADOS e SISTEMA
+ */
+export async function generateTargetedBackup(
+  allowedCollections: string[],
+  prefixName: string,
+  backupLabel: string,
+  onProgress?: (msg: string) => void,
+): Promise<BackupResult> {
+  try {
+    const backupData: BackupData = {};
+    const stats: Record<string, number> = {};
+    const organStats: Record<string, number> = {};
+    let totalRecords = 0;
+    const errors: string[] = [];
+
+    const loggedInUser = getLoggedInUser();
+    const isAdmin = isUserAdmin(loggedInUser);
+    const sectorFilter = (!isAdmin && loggedInUser) ? String(loggedInUser.setor || loggedInUser.sector || loggedInUser.reparticao || loggedInUser.departamento || "").toLowerCase().trim() : "";
+
+    let collIndex = 0;
+    const totalColls = allowedCollections.length;
+
+    for (const collName of allowedCollections) {
+      collIndex++;
+      const progressMsg = `[${backupLabel}] A recolher coleção ${collName} (${collIndex}/${totalColls})... Total acumulado: ${totalRecords} registos`;
+      if (onProgress) onProgress(progressMsg);
+      dispatchBackupAlert({
+        status: "in_progress",
+        message: progressMsg,
+        progressPercent: Math.round((collIndex / totalColls) * 90),
+      });
+
+      try {
+        let docs: BackupDocument[] = [];
+        if (db) {
+          try {
+            const snapshot = await getDocs(collection(db, collName));
+            docs = snapshot.docs.map((docItem) => ({
+              id: docItem.id,
+              ...docItem.data(),
+            }));
+          } catch (dbErr) {
+            console.warn(`Aviso ao ler ${collName} no Firestore:`, dbErr);
+          }
+        }
+
+        try {
+          const localKey = `sigep_local_${collName}`;
+          const localVal = localStorage.getItem(localKey);
+          if (localVal) {
+            const parsedLocal: any[] = JSON.parse(localVal);
+            if (Array.isArray(parsedLocal)) {
+              const map = new Map<string, BackupDocument>();
+              docs.forEach((d) => { if (d.id) map.set(d.id, d); });
+              parsedLocal.forEach((item) => {
+                const itemId = item.id || "local_" + Math.random().toString(36).substring(2, 9);
+                if (!map.has(itemId)) {
+                  map.set(itemId, { id: itemId, ...item });
+                }
+              });
+              docs = Array.from(map.values());
+            }
+          }
+        } catch (e) {
+          console.error(`Erro local storage para ${collName}:`, e);
+        }
+
+        // Se for utilizador setorial (não administrador), filtrar estritamente para o seu setor
+        if (sectorFilter && prefixName === "SIGEP_BACKUP_DADOS") {
+          docs = docs.filter((docItem: any) => {
+            const itemSector = String(docItem.setor || docItem.sector || docItem.reparticao || docItem.departamento || "").toLowerCase().trim();
+            const itemOwner = String(docItem.email || docItem.criadoPor || "").toLowerCase().trim();
+            const userEmail = String(loggedInUser?.email || "").toLowerCase().trim();
+            if (itemOwner && userEmail && itemOwner === userEmail) return true;
+            if (!itemSector) return false;
+            return itemSector.includes(sectorFilter) || sectorFilter.includes(itemSector);
+          });
+        }
+
+        if (docs.length > 0) {
+          backupData[collName] = docs;
+          stats[collName] = docs.length;
+          totalRecords += docs.length;
+
+          const activeOrgan = SYSTEM_ORGAOS.find((o) => o.collections.includes(collName));
+          if (activeOrgan) {
+            organStats[activeOrgan.id] = (organStats[activeOrgan.id] || 0) + docs.length;
+          }
+
+          if (onProgress) onProgress(`[${backupLabel}] ${collName}: ${docs.length} registos recolhidos (Total: ${totalRecords})`);
+        }
+      } catch (err: any) {
+        errors.push(`Falha em ${collName}: ${err?.message || err}`);
+      }
+    }
+
+    if (onProgress) onProgress(`A preparar ficheiro JSON para ${backupLabel}...`);
+
+    const jsonString = safeJSONStringify(backupData, null, 2);
+    const blob = new Blob([jsonString], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+
+    const now = new Date();
+    const ano = now.getFullYear();
+    const mesNum = String(now.getMonth() + 1).padStart(2, "0");
+    const diaNum = String(now.getDate()).padStart(2, "0");
+    const horas = String(now.getHours()).padStart(2, "0");
+    const minutos = String(now.getMinutes()).padStart(2, "0");
+    const segundos = String(now.getSeconds()).padStart(2, "0");
+
+    const filename = `${prefixName}_${ano}-${mesNum}-${diaNum}_${horas}h${minutos}m${segundos}s.json`;
+
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = filename;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+
+    dispatchBackupAlert({
+      status: "completed",
+      message: `${backupLabel} concluído com sucesso! ${totalRecords} registos exportados.`,
+      progressPercent: 100,
+    });
+
+    return {
+      success: true,
+      filename,
+      collectionStats: stats,
+      organStats,
+      error: errors.length > 0 ? errors.join("; ") : undefined,
+    };
+  } catch (err: any) {
+    console.error(`Erro em ${backupLabel}:`, err);
+    dispatchBackupAlert({
+      status: "error",
+      message: `Erro em ${backupLabel}: ${err?.message || err}`,
+    });
+    return { success: false, error: err?.message || String(err) };
+  }
+}
+
+export async function exportDataBackup(onProgress?: (msg: string) => void): Promise<BackupResult> {
+  const dataColls = [
+    "historico_chefias", "colaboradores_chefia", "institucional_plans", "reports", "monografia", "signatures", "accessAlerts",
+    "efetivo_escolar", "alunos", "matriculas", "alocacoes_docentes", "turmas", "disciplinas_academicas", "espacos_fisicos", "exames", "bolsas", "atendimentos_estudantis", "library_books", "library_visits", "colaboradores_formacao",
+    "colaboradores", "processos_individuais", "assiduidade", "financial_data", "suppliers", "materiais_bens", "movimentos_economato", "inventarios_patrimoniais", "requisicoes_internas", "expedientes", "archive_documents", "service_requests",
+    "actividades", "matrix_activities", "plano_actividades", "plan_schedules", "produtosUnificados", "pedidos"
+  ];
+  return generateTargetedBackup(dataColls, "SIGEP_BACKUP_DADOS", "Backup de Dados", onProgress);
+}
+
+export async function exportSystemBackup(onProgress?: (msg: string) => void): Promise<BackupResult> {
+  const systemColls = [
+    "users", "documentos_normativos", "calendar_events", "notes", "messages", "configuracoes", "config_sistema", "drafts", "system_backups"
+  ];
+  return generateTargetedBackup(systemColls, "SIGEP_BACKUP_SISTEMA", "Backup do Sistema", onProgress);
+}
+
+export async function restoreTargetedBackup(
+  rawInputData: BackupData | any[],
+  allowedCollections: string[],
+  backupLabel: string,
+  onProgress?: (msg: string) => void,
+): Promise<{ totalRestored: number; restoredStats: Record<string, number>; organStats: Record<string, number> }> {
+  let totalRestored = 0;
+  const restoredStats: Record<string, number> = {};
+  const organStats: Record<string, number> = {};
+
+  let data: BackupData = {};
+  if (Array.isArray(rawInputData)) {
+    data = { [allowedCollections[0]]: rawInputData };
+  } else if (rawInputData && typeof rawInputData === "object") {
+    data = rawInputData;
+  }
+
+  let collIndex = 0;
+  const totalColls = allowedCollections.length;
+
+  for (const collName of allowedCollections) {
+    collIndex++;
+    let docs: BackupDocument[] = [];
+
+    for (const [key, value] of Object.entries(data)) {
+      if (key.startsWith("_localStorage_") || key.startsWith("_metadata_")) continue;
+      const normalized = COLLECTION_ALIASES[key] || COLLECTION_ALIASES[key.toLowerCase()] || key.toLowerCase();
+      if ((normalized === collName || key.toLowerCase() === collName.toLowerCase()) && Array.isArray(value)) {
+        docs = docs.concat(value);
+      }
+    }
+
+    if (docs.length === 0) continue;
+
+    const progressMsg = `[${backupLabel}] A restaurar coleção ${collName} (${docs.length} registos)... Total restaurado: ${totalRestored}`;
+    if (onProgress) onProgress(progressMsg);
+    dispatchBackupAlert({
+      status: "in_progress",
+      message: progressMsg,
+      progressPercent: Math.round((collIndex / totalColls) * 90),
+    });
+
+    let collCount = 0;
+    const isActivityCollection = ["matrix_activities", "actividades", "plano_actividades"].includes(collName);
+
+    for (let i = 0; i < docs.length; i += 500) {
+      const chunk = docs.slice(i, i + 500);
+      if (db) {
+        try {
+          const batch = writeBatch(db);
+          let batchCount = 0;
+          chunk.forEach((docData) => {
+            if (!docData || typeof docData !== "object") return;
+            const cleanItem = isActivityCollection ? normalizePlannedActivity(docData) : docData;
+            const { id, ...rest } = cleanItem as any;
+            const targetId = id || "restored_" + Math.random().toString(36).substring(2, 9);
+            const docRef = doc(db, collName, targetId);
+            batch.set(docRef, { ...rest, id: targetId });
+            batchCount++;
+          });
+          await batch.commit();
+          collCount += batchCount;
+          totalRestored += batchCount;
+        } catch (batchErr) {
+          console.warn(`Erro ao commitar batch para ${collName}:`, batchErr);
+        }
+      }
+    }
+
+    restoredStats[collName] = collCount;
+    const activeOrgan = SYSTEM_ORGAOS.find((o) => o.collections.includes(collName));
+    if (activeOrgan) {
+      organStats[activeOrgan.id] = (organStats[activeOrgan.id] || 0) + collCount;
+    }
+
+    if (onProgress) onProgress(`[${backupLabel}] ${collName}: ${collCount} registos restaurados (Total acumulado: ${totalRestored})`);
+  }
+
+  dispatchBackupAlert({
+    status: "completed",
+    message: `${backupLabel} concluído! ${totalRestored} registos restaurados com sucesso.`,
+    progressPercent: 100,
+  });
+
+  return { totalRestored, restoredStats, organStats };
+}
+
+export async function restoreDataBackup(rawInputData: BackupData | any[], onProgress?: (msg: string) => void) {
+  const dataColls = [
+    "historico_chefias", "colaboradores_chefia", "institucional_plans", "reports", "monografia", "signatures", "accessAlerts",
+    "efetivo_escolar", "alunos", "matriculas", "alocacoes_docentes", "turmas", "disciplinas_academicas", "espacos_fisicos", "exames", "bolsas", "atendimentos_estudantis", "library_books", "library_visits", "colaboradores_formacao",
+    "colaboradores", "processos_individuais", "assiduidade", "financial_data", "suppliers", "materiais_bens", "movimentos_economato", "inventarios_patrimoniais", "requisicoes_internas", "expedientes", "archive_documents", "service_requests",
+    "actividades", "matrix_activities", "plano_actividades", "plan_schedules", "produtosUnificados", "pedidos"
+  ];
+  return restoreTargetedBackup(rawInputData, dataColls, "Restauração de Dados", onProgress);
+}
+
+export async function restoreSystemBackup(rawInputData: BackupData | any[], onProgress?: (msg: string) => void) {
+  const systemColls = [
+    "users", "documentos_normativos", "calendar_events", "notes", "messages", "configuracoes", "config_sistema", "drafts", "system_backups"
+  ];
+  return restoreTargetedBackup(rawInputData, systemColls, "Restauração do Sistema", onProgress);
 }
 

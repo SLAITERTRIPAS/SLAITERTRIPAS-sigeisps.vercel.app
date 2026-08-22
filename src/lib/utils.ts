@@ -93,6 +93,32 @@ export function sanitizeForJSON(obj: any, seen = new WeakSet()): any {
         try { return obj.toDate().toISOString(); } catch (e) { return null; }
       }
 
+      // Check constructor name for Firebase/internal internal classes like Y2, Ka, etc.
+      const ctorName = obj.constructor && typeof obj.constructor.name === "string" ? obj.constructor.name : "";
+      if (
+        ctorName.length <= 3 && /^[A-Z][a-zA-Z0-9]*$/.test(ctorName) && ctorName !== "Map" && ctorName !== "Set" && ctorName !== "Error"
+      ) {
+        return undefined;
+      }
+
+      // Extra check for React / DOM / Event objects / internal SDK instances / circular structures
+      if (
+        (typeof Node !== "undefined" && obj instanceof Node) ||
+        (typeof Window !== "undefined" && obj instanceof Window) ||
+        (typeof Event !== "undefined" && obj instanceof Event) ||
+        obj.nodeType ||
+        obj.$$typeof ||
+        obj.nativeEvent ||
+        obj.src ||
+        obj.i ||
+        obj._delegate
+      ) {
+        if (typeof obj.path === "string" || typeof obj.path === "number") return String(obj.path);
+        if (typeof obj.id === "string" || typeof obj.id === "number") return String(obj.id);
+        if (typeof obj.message === "string") return obj.message;
+        return undefined;
+      }
+
       if (Array.isArray(obj)) {
         return obj
           .map((item) => sanitizeForJSON(item, seen))
@@ -103,18 +129,6 @@ export function sanitizeForJSON(obj: any, seen = new WeakSet()): any {
         if (typeof obj.path === "string" || typeof obj.path === "number") return String(obj.path);
         if (typeof obj.id === "string" || typeof obj.id === "number") return String(obj.id);
         if (typeof obj.uid === "string" || typeof obj.uid === "number") return { uid: String(obj.uid), email: String(obj.email || "") };
-        return undefined;
-      }
-
-      // Extra check for React / DOM / Event objects
-      if (
-        (typeof Node !== "undefined" && obj instanceof Node) ||
-        (typeof Window !== "undefined" && obj instanceof Window) ||
-        (typeof Event !== "undefined" && obj instanceof Event) ||
-        obj.nodeType ||
-        obj.$$typeof ||
-        obj.nativeEvent
-      ) {
         return undefined;
       }
 
@@ -168,9 +182,20 @@ export const getCircularReplacer = () => {
           return value;
         }
 
+        const ctorName = value.constructor && typeof value.constructor.name === "string" ? value.constructor.name : "";
+        if (
+          (ctorName.length <= 3 && /^[A-Z][a-zA-Z0-9]*$/.test(ctorName) && ctorName !== "Map" && ctorName !== "Set" && ctorName !== "Error") ||
+          value.src ||
+          value.i ||
+          value._delegate
+        ) {
+          return undefined;
+        }
+
         if (!isPlainObject(value)) {
           if (typeof value.path === "string" || typeof value.path === "number") return String(value.path);
           if (typeof value.id === "string" || typeof value.id === "number") return String(value.id);
+          if (typeof value.message === "string") return value.message;
           return undefined;
         }
 
@@ -180,7 +205,10 @@ export const getCircularReplacer = () => {
           (typeof Event !== "undefined" && value instanceof Event) ||
           value.nodeType ||
           value.$$typeof ||
-          value.nativeEvent
+          value.nativeEvent ||
+          value.src ||
+          value.i ||
+          value._delegate
         ) {
           return undefined;
         }

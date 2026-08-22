@@ -23,10 +23,22 @@ export const canAccessArea = (
 ) => {
   if (!user) return false;
   
-  // Super Boss, Admin, etc can see everything
+  // Super Boss, Admin, etc can see everything (Institutional/Pai)
   if (isSuperBossUser(user)) {
     return true;
   }
+
+  const role = String(user.role || "").toLowerCase();
+  const isSysAdmin =
+    role === "admin" ||
+    role === "administrador" ||
+    role === "administrador do sistema" ||
+    role === "proprietario" ||
+    role === "proprietário" ||
+    user.isOwner === true ||
+    (user.categoria || "").toLowerCase().includes("programador");
+
+  if (isSysAdmin) return true;
 
   const norm = (s: string) =>
     String(s || "")
@@ -39,38 +51,46 @@ export const canAccessArea = (
       .replace(/^curso\s+(de\s+|da\s+|dos\s+|do\s+)?/i, "")
       .trim();
 
-  const role = norm(user.role || "");
-  const title = norm(user.title || user.cargo || user.cargoChefia || "");
-  const combinedRole = role + " " + title;
+  const userRoleStr = String(user.title || user.cargo || user.cargoChefia || "").toLowerCase();
+  const userRoles = getRoles(userRoleStr);
 
   const uDir = norm(user.direcao || "");
   const uDept = norm(user.departamento || "");
   const uSector = norm(user.setor || user.reparticao || "");
-  
-  // Lista combinada de todas as áreas do utilizador
-  const userAreas = [uDir, uDept, uSector].filter(Boolean);
 
   const tDir = norm(targetDir || "");
   const tDept = norm(targetDept || "");
   const tSector = norm(targetSector || "");
 
-  // Se a direção do utilizador corresponde à direção da atividade
-  if (uDir && tDir && (tDir.includes(uDir) || uDir.includes(tDir) || tDir === uDir)) {
+  // Família Independente por Direção (Filho)
+  if (uDir && tDir) {
+    const dirMatch = tDir.includes(uDir) || uDir.includes(tDir) || tDir === uDir;
+    if (!dirMatch) return false; // Direção diferente -> Família independente, bloqueio total
+  }
+
+  // Se é Diretor de Direção (vê toda a sua Direção / Família)
+  if (userRoles.isDC) {
     return true;
   }
 
-  // Diretores Centrais / Chefes -> acessam Direções / Departamentos / Setores
-  if (combinedRole.includes("diretor") || combinedRole.includes("director") || combinedRole.includes("chefe")) {
-    if (tDir && userAreas.some(area => tDir.includes(area) || area.includes(tDir))) return true;
-    if (tDept && userAreas.some(area => tDept.includes(area) || area.includes(tDept) || area === tDept)) return true;
-    if (tSector && userAreas.some(area => tSector.includes(area) || area.includes(tSector) || area === tSector)) return true;
+  // Família Independente por Departamento (Neto)
+  if (uDept && tDept) {
+    const deptMatch = tDept.includes(uDept) || uDept.includes(tDept) || tDept === uDept;
+    if (!deptMatch) return false; // Departamento diferente -> Isolado
   }
 
-  if (tSector && userAreas.some(area => tSector.includes(area) || area.includes(tSector) || area === tSector)) return true;
-  if (tDept && userAreas.some(area => tDept.includes(area) || area.includes(tDept) || area === tDept)) return true;
-  if (tDir && userAreas.some(area => tDir.includes(area) || area.includes(tDir) || area === tDir)) return true;
+  // Se é Chefe de Departamento
+  if (userRoles.isCD) {
+    return true;
+  }
 
-  return false;
+  // Família Independente por Setor / Repartição (Bisneto)
+  if (uSector && tSector) {
+    const sectorMatch = tSector.includes(uSector) || uSector.includes(tSector) || tSector === uSector;
+    if (!sectorMatch) return false;
+  }
+
+  return true;
 };
 
 /**

@@ -15,6 +15,8 @@ import {
   ArrowLeft,
   LayoutGrid,
   ChevronRight,
+  FileText,
+  X,
 } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import { InstitutionalHeader } from "./InstitutionalHeader";
@@ -502,6 +504,7 @@ export default function AcaoOrcamentalView({
     "institucional" | "direcao" | "departamento" | "reparticao" | "setor"
   >("institucional");
   const [selectedUnit, setSelectedUnit] = useState<string>("todos");
+  const [showActivitiesModal, setShowActivitiesModal] = useState(false);
 
   const isPlanificacaoOrDPEP = useMemo(() => {
     if (isSuperBossUser(user)) return true;
@@ -609,14 +612,30 @@ export default function AcaoOrcamentalView({
     }
   }, [title, isPlanificacaoOrDPEP, user, userDirecao, userDepartamento]);
 
-  // Resetar a unidade selecionada quando muda o nível
+  // Resetar a unidade selecionada quando muda o nível ou garantir unidade inicial válida
   const handleLevelChange = (
     lvl: "institucional" | "direcao" | "departamento" | "reparticao" | "setor"
   ) => {
     if (!isPlanificacaoOrDPEP) return; // Apenas o setor de planificação pode alterar o nível
     setSelectedLevel(lvl);
-    setSelectedUnit("todos");
+    if (lvl === "institucional") {
+      setSelectedUnit("todos");
+    } else {
+      const units = levelUnits[lvl];
+      setSelectedUnit(units && units.length > 0 ? units[0] : "");
+    }
   };
+
+  React.useEffect(() => {
+    if (selectedLevel !== "institucional") {
+      const units = levelUnits[selectedLevel];
+      if (units && units.length > 0) {
+        if (!selectedUnit || selectedUnit === "todos" || !units.includes(selectedUnit)) {
+          setSelectedUnit(units[0]);
+        }
+      }
+    }
+  }, [selectedLevel, levelUnits]);
 
   // Filtrar atividades conforme o Nível Estrutural e a Unidade Selecionada
   const sectorActivities = useMemo(() => {
@@ -1987,10 +2006,7 @@ export default function AcaoOrcamentalView({
                   <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-1">Nível de Visualização</label>
                   <select 
                     value={selectedLevel}
-                    onChange={(e) => {
-                      setSelectedLevel(e.target.value as any);
-                      setSelectedUnit("todos");
-                    }}
+                    onChange={(e) => handleLevelChange(e.target.value as any)}
                     className="w-full bg-slate-50 border border-slate-200 rounded-xl p-2.5 text-xs font-bold text-slate-700 focus:ring-2 focus:ring-indigo-500/20 transition-all cursor-pointer"
                   >
                     <option value="institucional">Institucional (Geral)</option>
@@ -2008,7 +2024,7 @@ export default function AcaoOrcamentalView({
                     onChange={(e) => setSelectedUnit(e.target.value)}
                     className="w-full bg-slate-50 border border-slate-200 rounded-xl p-2.5 text-xs font-bold text-slate-700 focus:ring-2 focus:ring-indigo-500/20 transition-all cursor-pointer"
                   >
-                    <option value="todos">Todos ({selectedLevel === "institucional" ? "Geral" : "da categoria"})</option>
+                    {selectedLevel === "institucional" && <option value="todos">Todos (Geral)</option>}
                     {selectedLevel === "direcao" && levelUnits.direcao.map(u => <option key={u} value={u}>{u}</option>)}
                     {selectedLevel === "departamento" && levelUnits.departamento.map(u => <option key={u} value={u}>{u}</option>)}
                     {selectedLevel === "reparticao" && levelUnits.reparticao.map(u => <option key={u} value={u}>{u}</option>)}
@@ -2018,6 +2034,29 @@ export default function AcaoOrcamentalView({
               </div>
             </div>
           )}
+
+          {/* Consultar Plano de Atividade Banner */}
+          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center bg-blue-900/5 border border-blue-200/80 p-5 rounded-3xl gap-4 shadow-xs">
+            <div className="flex items-center gap-3.5">
+              <div className="p-3 bg-blue-600 text-white rounded-2xl shadow-sm shrink-0">
+                <FileText size={22} />
+              </div>
+              <div>
+                <h4 className="text-sm font-black text-blue-950 uppercase tracking-wider">Ação Orçamental & Atividades do Setor</h4>
+                <p className="text-xs text-slate-600 font-medium mt-0.5">
+                  {sectorActivities.length > 0 
+                    ? `Existem ${sectorActivities.length} atividade(s) planificada(s). Sem atividade, sem ação orçamental.` 
+                    : "Sem atividade planificada, logo sem ação orçamental."}
+                </p>
+              </div>
+            </div>
+            <button
+              onClick={() => setShowActivitiesModal(true)}
+              className="px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-black text-xs uppercase tracking-widest rounded-2xl transition-all shadow-md shadow-blue-500/20 flex items-center gap-2 cursor-pointer shrink-0"
+            >
+              <FileText size={16} /> Consultar Plano de Atividade ({sectorActivities.length})
+            </button>
+          </div>
 
           {/* Metrics Cards */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -2591,6 +2630,79 @@ export default function AcaoOrcamentalView({
                   </div>
                 </div>
               ))}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal de Consulta de Plano de Atividade */}
+      {showActivitiesModal && (
+        <div className="fixed inset-0 z-[120] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs">
+          <div className="bg-white rounded-3xl max-w-4xl w-full max-h-[85vh] flex flex-col shadow-2xl overflow-hidden border border-slate-200 animate-in fade-in zoom-in duration-200">
+            <div className="p-6 bg-slate-900 text-white flex justify-between items-center">
+              <div className="flex items-center gap-3">
+                <div className="p-2.5 bg-blue-600/30 text-blue-400 rounded-xl">
+                  <FileText size={22} />
+                </div>
+                <div>
+                  <h3 className="text-base font-black tracking-tight">Plano de Atividade Existente</h3>
+                  <p className="text-xs text-slate-400 mt-0.5">Atividades planificadas e vinculadas à ação orçamental do setor atual</p>
+                </div>
+              </div>
+              <button
+                onClick={() => setShowActivitiesModal(false)}
+                className="p-2 hover:bg-white/10 text-slate-400 hover:text-white rounded-xl transition-colors cursor-pointer"
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            <div className="p-6 overflow-y-auto space-y-4 flex-1 bg-slate-50">
+              {sectorActivities.length === 0 ? (
+                <div className="text-center py-16 bg-white rounded-2xl border border-slate-200 p-8">
+                  <AlertCircle size={40} className="mx-auto text-amber-500 mb-3" />
+                  <h4 className="text-lg font-black text-slate-900">Sem Atividade, Sem Ação Orçamental</h4>
+                  <p className="text-sm text-slate-500 mt-1">Este setor não possui atividades planificadas no momento, logo o orçamento associado é zero.</p>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {sectorActivities.map((act, idx) => (
+                    <div key={act.id || idx} className="bg-white p-5 rounded-2xl border border-slate-200 shadow-xs space-y-3 hover:border-blue-300 transition-all">
+                      <div className="flex justify-between items-start gap-4">
+                        <div>
+                          <span className="text-[10px] font-black font-mono bg-blue-50 text-blue-700 px-2.5 py-1 rounded-md border border-blue-100">
+                            {act.codigo || act.id || `ATV-${idx + 1}`}
+                          </span>
+                          <h4 className="text-sm font-black text-slate-900 mt-2">{act.nome || act.atividade || act.descricao}</h4>
+                        </div>
+                        <div className="text-right">
+                          <span className="text-sm font-black font-mono text-emerald-700 block">
+                            {Number(act.valor || act.orcamentoTotal || act.valorTotal || act.orcamento || 0).toLocaleString("pt-MZ", { minimumFractionDigits: 2 })} MZN
+                          </span>
+                          <span className="text-[10px] text-slate-400 font-bold block mt-0.5">
+                            Fonte: {act.fonteReceita || act.orcamento || "OE"}
+                          </span>
+                        </div>
+                      </div>
+                      {act.objetivo || act.detalhes ? (
+                        <p className="text-xs text-slate-600 leading-relaxed bg-slate-50 p-3 rounded-xl border border-slate-100">
+                          {act.objetivo || act.detalhes}
+                        </p>
+                      ) : null}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            <div className="p-4 bg-white border-t border-slate-200 flex justify-end">
+              <button
+                type="button"
+                onClick={() => setShowActivitiesModal(false)}
+                className="px-6 py-2.5 bg-slate-900 hover:bg-slate-800 text-white font-black text-xs uppercase tracking-widest rounded-xl transition-all cursor-pointer shadow-sm"
+              >
+                Fechar
+              </button>
             </div>
           </div>
         </div>

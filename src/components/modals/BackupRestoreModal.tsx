@@ -18,13 +18,22 @@ import {
   HardDrive,
   FileCheck,
   Sparkles,
+  Folder,
+  FolderOpen,
+  Calendar,
+  Trash2,
 } from "lucide-react";
 import {
   exportFullBackup,
   restoreFullBackup,
+  exportDataBackup,
+  exportSystemBackup,
+  restoreDataBackup,
+  restoreSystemBackup,
   runAutomaticBackup,
   getStoredBackupsList,
   downloadStoredBackupFile,
+  deleteStoredBackup,
   SYSTEM_ORGAOS,
   SystemBackupRecord,
 } from "../../lib/backupService";
@@ -72,38 +81,98 @@ export default function BackupRestoreModal({
 
   if (!isOpen) return null;
 
-  const handleExportBackup = async () => {
+  const handleExportData = async () => {
     try {
       setLoading(true);
-      setStatusMessage("A preparar verificação e recolha estruturada dos 4 Órgãos...");
+      setStatusMessage("A iniciar Backup Independente de DADOS...");
       setErrorMessage("");
       setSuccessMessage("");
-      setCurrentOrganProcessing("");
-
-      const result = await exportFullBackup((msg) => {
-        setStatusMessage(msg);
-        if (msg.includes("Órgão")) {
-          setCurrentOrganProcessing(msg);
-        }
-      });
-
-      if (result.success) {
-        setStats(result.collectionStats || null);
-        setOrganStats(result.organStats || null);
-        setSuccessMessage(
-          "Backup completo dos 4 Órgãos exportado com sucesso! Guarde este ficheiro JSON no seu computador.",
-        );
-        loadStoredBackups();
+      const res = await exportDataBackup((msg) => setStatusMessage(msg));
+      if (res.success) {
+        setStats(res.collectionStats || null);
+        setOrganStats(res.organStats || null);
+        setSuccessMessage("Backup de Dados exportado com sucesso!");
       } else {
-        setErrorMessage("Erro ao exportar backup: " + (result.error || "Desconhecido"));
+        setErrorMessage("Erro ao exportar dados: " + res.error);
       }
-    } catch (error: any) {
-      console.error("Erro ao exportar backup:", error);
-      setErrorMessage("Erro ao gerar backup: " + (error?.message || error));
+    } catch (err: any) {
+      setErrorMessage("Erro: " + err?.message);
     } finally {
       setLoading(false);
-      setCurrentOrganProcessing("");
     }
+  };
+
+  const handleExportSystem = async () => {
+    try {
+      setLoading(true);
+      setStatusMessage("A iniciar Backup Independente do SISTEMA...");
+      setErrorMessage("");
+      setSuccessMessage("");
+      const res = await exportSystemBackup((msg) => setStatusMessage(msg));
+      if (res.success) {
+        setStats(res.collectionStats || null);
+        setOrganStats(res.organStats || null);
+        setSuccessMessage("Backup do Sistema exportado com sucesso!");
+      } else {
+        setErrorMessage("Erro ao exportar sistema: " + res.error);
+      }
+    } catch (err: any) {
+      setErrorMessage("Erro: " + err?.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleFileUploadData = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (!window.confirm("Tem a certeza que deseja restaurar o Backup de DADOS? Esta operação atualizará os registos de dados existentes.")) {
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = async (event) => {
+      try {
+        setLoading(true);
+        setStatusMessage("A restaurar Backup de DADOS com contagem em tempo real...");
+        const parsed = JSON.parse(event.target?.result as string);
+        const res = await restoreDataBackup(parsed, (msg) => setStatusMessage(msg));
+        setStats(res.restoredStats);
+        setOrganStats(res.organStats);
+        setSuccessMessage(`Restauração de Dados concluída com sucesso! ${res.totalRestored} registos restaurados. O sistema atualizará em instantes...`);
+        setTimeout(() => window.location.reload(), 2000);
+      } catch (err: any) {
+        setErrorMessage("Erro ao restaurar dados: " + err?.message);
+      } finally {
+        setLoading(false);
+      }
+    };
+    reader.readAsText(file);
+  };
+
+  const handleFileUploadSystem = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (!window.confirm("Tem a certeza que deseja restaurar o Backup do SISTEMA? Esta operação atualizará as configurações e utilizadores do sistema.")) {
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = async (event) => {
+      try {
+        setLoading(true);
+        setStatusMessage("A restaurar Backup do SISTEMA com contagem em tempo real...");
+        const parsed = JSON.parse(event.target?.result as string);
+        const res = await restoreSystemBackup(parsed, (msg) => setStatusMessage(msg));
+        setStats(res.restoredStats);
+        setOrganStats(res.organStats);
+        setSuccessMessage(`Restauração do Sistema concluída com sucesso! ${res.totalRestored} registos restaurados. O sistema atualizará em instantes...`);
+        setTimeout(() => window.location.reload(), 2000);
+      } catch (err: any) {
+        setErrorMessage("Erro ao restaurar sistema: " + err?.message);
+      } finally {
+        setLoading(false);
+      }
+    };
+    reader.readAsText(file);
   };
 
   const handleRunAutoBackupNow = async () => {
@@ -172,6 +241,37 @@ export default function BackupRestoreModal({
     } catch (err: any) {
       console.error("Erro ao restaurar do backup armazenado:", err);
       setErrorMessage("Erro na restauração: " + (err?.message || err));
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleDeleteStoredBackup = async (record: SystemBackupRecord) => {
+    if (
+      !window.confirm(
+        `AVISO: Tem a certeza absoluta que deseja EXCLUIR DEFINITIVAMENTE o backup de ${record.formattedDate} (${record.totalRecords} registos)?\n\nEsta operação é irreversível e o backup será removido do sistema de forma permanente.`,
+      )
+    ) {
+      return;
+    }
+
+    try {
+      setLoading(true);
+      setStatusMessage(`A excluir backup de ${record.formattedDate}...`);
+      setErrorMessage("");
+      setSuccessMessage("");
+
+      const success = await deleteStoredBackup(record.id);
+      
+      if (success) {
+        setSuccessMessage(`O backup de ${record.formattedDate} foi excluído permanentemente com sucesso.`);
+        loadStoredBackups(); // Refresh the list
+      } else {
+        setErrorMessage(`Falha ao excluir o backup de ${record.formattedDate}.`);
+      }
+    } catch (err: any) {
+      console.error("Erro ao excluir backup:", err);
+      setErrorMessage("Erro ao excluir backup: " + (err?.message || err));
     } finally {
       setLoading(false);
     }
@@ -384,63 +484,93 @@ export default function BackupRestoreModal({
                 </div>
               </div>
 
-              {/* Action Cards */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2">
-                {/* Export Card */}
-                <div className="border-2 border-indigo-100 bg-indigo-50/40 rounded-2xl p-5 flex flex-col justify-between hover:border-[#121c60] transition-all">
-                  <div>
-                    <div className="w-10 h-10 bg-[#121c60] text-white rounded-xl flex items-center justify-center mb-3 shadow-md">
-                      <Download size={20} />
-                    </div>
-                    <h4 className="font-black text-[#121c60] text-base mb-1">
-                      Exportar Ficheiro JSON do Backup
-                    </h4>
-                    <p className="text-xs text-gray-600 mb-4 leading-relaxed">
-                      Efetua a recolha direta de todos os registos dos 4 Órgãos e gera um ficheiro JSON estruturado para guardar no computador.
-                    </p>
-                  </div>
-                  <button
-                    onClick={handleExportBackup}
-                    disabled={loading}
-                    className="w-full bg-[#121c60] hover:bg-[#1a2b70] text-white font-black py-2.5 px-4 rounded-xl flex items-center justify-center gap-2 shadow-md transition-all disabled:opacity-50"
-                  >
-                    {loading ? (
-                      <RefreshCw className="animate-spin" size={16} />
-                    ) : (
-                      <Download size={16} />
-                    )}
-                    <span>Descarregar Backup Completo (JSON)</span>
-                  </button>
+              {/* Action Cards - Independência Total entre Dados e Sistema */}
+              <div className="space-y-4 pt-2">
+                <div className="border-b border-gray-200 pb-2">
+                  <h4 className="font-black text-[#121c60] text-sm uppercase tracking-wider">
+                    Operações Independentes de Backup e Restauração
+                  </h4>
+                  <p className="text-xs text-gray-500">
+                    O sistema mantém os backups de Dados e de Sistema completamente separados e independentes.
+                  </p>
                 </div>
 
-                {/* Import Card */}
-                <div className="border-2 border-emerald-100 bg-emerald-50/40 rounded-2xl p-5 flex flex-col justify-between hover:border-emerald-600 transition-all">
-                  <div>
-                    <div className="w-10 h-10 bg-emerald-700 text-white rounded-xl flex items-center justify-center mb-3 shadow-md">
-                      <Upload size={20} />
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {/* Bloco de Dados */}
+                  <div className="border-2 border-indigo-200 bg-indigo-50/30 rounded-2xl p-5 flex flex-col justify-between hover:border-[#121c60] transition-all space-y-4">
+                    <div>
+                      <div className="w-10 h-10 bg-[#121c60] text-white rounded-xl flex items-center justify-center mb-3 shadow-md">
+                        <Database size={20} />
+                      </div>
+                      <h4 className="font-black text-[#121c60] text-base mb-1">
+                        Backup e Restauração de DADOS
+                      </h4>
+                      <p className="text-xs text-gray-600 mb-4 leading-relaxed">
+                        Exclusivo para registos institucionais, colaboradores, atividades, estudantes, finanças e inventário dos 4 Órgãos.
+                      </p>
                     </div>
-                    <h4 className="font-black text-emerald-900 text-base mb-1">
-                      Restaurar de Ficheiro Local
-                    </h4>
-                    <p className="text-xs text-gray-600 mb-4 leading-relaxed">
-                      Selecione um ficheiro JSON anteriormente exportado para regravar integralmente a informação nos 4 Órgãos do Firestore.
-                    </p>
+
+                    <div className="space-y-2">
+                      <button
+                        onClick={handleExportData}
+                        disabled={loading}
+                        className="w-full bg-[#121c60] hover:bg-[#1a2b70] text-white font-black py-2.5 px-4 rounded-xl flex items-center justify-center gap-2 shadow-md transition-all disabled:opacity-50 text-xs"
+                      >
+                        {loading ? <RefreshCw className="animate-spin" size={15} /> : <Download size={15} />}
+                        <span>Descarregar Backup de Dados (JSON)</span>
+                      </button>
+
+                      <label className="w-full bg-indigo-700 hover:bg-indigo-800 text-white font-black py-2.5 px-4 rounded-xl flex items-center justify-center gap-2 shadow-md transition-all cursor-pointer text-xs">
+                        {loading ? <RefreshCw className="animate-spin" size={15} /> : <Upload size={15} />}
+                        <span>Restaurar Backup de Dados</span>
+                        <input
+                          type="file"
+                          accept=".json"
+                          onChange={handleFileUploadData}
+                          disabled={loading}
+                          className="hidden"
+                        />
+                      </label>
+                    </div>
                   </div>
-                  <label className="w-full bg-emerald-700 hover:bg-emerald-800 text-white font-black py-2.5 px-4 rounded-xl flex items-center justify-center gap-2 shadow-md transition-all cursor-pointer">
-                    {loading ? (
-                      <RefreshCw className="animate-spin" size={16} />
-                    ) : (
-                      <Upload size={16} />
-                    )}
-                    <span>Selecionar Ficheiro e Restaurar</span>
-                    <input
-                      type="file"
-                      accept=".json"
-                      onChange={handleFileUpload}
-                      disabled={loading}
-                      className="hidden"
-                    />
-                  </label>
+
+                  {/* Bloco de Sistema */}
+                  <div className="border-2 border-amber-200 bg-amber-50/30 rounded-2xl p-5 flex flex-col justify-between hover:border-amber-600 transition-all space-y-4">
+                    <div>
+                      <div className="w-10 h-10 bg-amber-600 text-white rounded-xl flex items-center justify-center mb-3 shadow-md">
+                        <Server size={20} />
+                      </div>
+                      <h4 className="font-black text-amber-900 text-base mb-1">
+                        Backup e Restauração do SISTEMA
+                      </h4>
+                      <p className="text-xs text-gray-600 mb-4 leading-relaxed">
+                        Exclusivo para contas de utilizadores, configurações gerais, documentos normativos, notas, calendário e mensagens.
+                      </p>
+                    </div>
+
+                    <div className="space-y-2">
+                      <button
+                        onClick={handleExportSystem}
+                        disabled={loading}
+                        className="w-full bg-amber-600 hover:bg-amber-700 text-white font-black py-2.5 px-4 rounded-xl flex items-center justify-center gap-2 shadow-md transition-all disabled:opacity-50 text-xs"
+                      >
+                        {loading ? <RefreshCw className="animate-spin" size={15} /> : <Download size={15} />}
+                        <span>Descarregar Backup do Sistema (JSON)</span>
+                      </button>
+
+                      <label className="w-full bg-amber-700 hover:bg-amber-800 text-white font-black py-2.5 px-4 rounded-xl flex items-center justify-center gap-2 shadow-md transition-all cursor-pointer text-xs">
+                        {loading ? <RefreshCw className="animate-spin" size={15} /> : <Upload size={15} />}
+                        <span>Restaurar Backup do Sistema</span>
+                        <input
+                          type="file"
+                          accept=".json"
+                          onChange={handleFileUploadSystem}
+                          disabled={loading}
+                          className="hidden"
+                        />
+                      </label>
+                    </div>
+                  </div>
                 </div>
               </div>
             </>
@@ -471,64 +601,127 @@ export default function BackupRestoreModal({
               {storedBackups.length === 0 ? (
                 <div className="p-8 text-center bg-gray-50 border border-dashed border-gray-300 rounded-2xl text-gray-500 space-y-2">
                   <Clock size={32} className="mx-auto text-gray-400" />
-                  <p className="font-bold text-sm">Nenhum backup automático registado ainda</p>
+                  <p className="font-bold text-sm">Nenhum backup registado ainda</p>
                   <p className="text-xs">
                     O sistema executa backups automaticamente de 12 em 12 horas ou ao clicar no botão acima.
                   </p>
                 </div>
               ) : (
-                <div className="space-y-3">
-                  {storedBackups.map((b) => (
-                    <div
-                      key={b.id}
-                      className="p-4 bg-white border border-gray-200 rounded-2xl shadow-xs hover:border-indigo-300 transition-all flex flex-col sm:flex-row sm:items-center justify-between gap-4"
-                    >
-                      <div className="space-y-1">
-                        <div className="flex items-center gap-2">
-                          <span className="font-black text-sm text-[#121c60]">
-                            {b.formattedDate}
-                          </span>
-                          <span
-                            className={`px-2 py-0.5 rounded-full text-[10px] font-black uppercase ${
-                              b.type === "manual"
-                                ? "bg-purple-100 text-purple-800"
-                                : "bg-blue-100 text-blue-800"
-                            }`}
-                          >
-                            {b.type === "manual" ? "Manual" : "Automático"}
-                          </span>
-                          <span className="bg-gray-100 text-gray-700 px-2 py-0.5 rounded text-[10px] font-bold">
-                            {b.totalSizeKB} KB
-                          </span>
-                        </div>
-                        <div className="text-xs text-gray-600 flex items-center gap-3">
-                          <span className="font-extrabold text-emerald-700">
-                            {b.totalRecords} registos no total
-                          </span>
-                          <span>•</span>
-                          <span>4 Órgãos processados</span>
-                        </div>
+                <div className="space-y-6">
+                  {Object.entries(
+                    storedBackups.reduce((acc, b) => {
+                      const d = new Date(b.timestamp || Date.now());
+                      const year = d.getFullYear().toString();
+                      const monthNames = ["Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"];
+                      const month = monthNames[d.getMonth()] || "Outros";
+                      const dayNum = String(d.getDate()).padStart(2, '0');
+                      const dayKey = `${dayNum} de ${month} de ${year}`;
+
+                      if (!acc[year]) acc[year] = {};
+                      if (!acc[year][month]) acc[year][month] = {};
+                      if (!acc[year][month][dayKey]) acc[year][month][dayKey] = [];
+                      acc[year][month][dayKey].push(b);
+                      return acc;
+                    }, {} as Record<string, Record<string, Record<string, SystemBackupRecord[]>>>)
+                  ).map(([year, months]) => (
+                    <div key={year} className="space-y-4">
+                      <div className="flex items-center gap-2 border-b-2 border-[#121c60] pb-2">
+                        <Folder className="text-[#121c60]" size={20} />
+                        <h5 className="font-black text-sm text-[#121c60] uppercase tracking-wider">
+                          Ano / Calendário: {year}
+                        </h5>
                       </div>
 
-                      <div className="flex items-center gap-2 shrink-0">
-                        <button
-                          onClick={() => downloadStoredBackupFile(b)}
-                          className="bg-indigo-50 hover:bg-indigo-100 text-[#121c60] font-bold text-xs px-3 py-2 rounded-xl border border-indigo-200 flex items-center gap-1.5 transition-all"
-                          title="Descarregar ficheiro JSON deste backup"
-                        >
-                          <Download size={14} />
-                          <span>Baixar JSON</span>
-                        </button>
-                        <button
-                          onClick={() => handleRestoreFromStored(b)}
-                          disabled={loading}
-                          className="bg-emerald-700 hover:bg-emerald-800 text-white font-bold text-xs px-3 py-2 rounded-xl flex items-center gap-1.5 transition-all disabled:opacity-50 shadow-xs"
-                          title="Restaurar a base de dados a partir deste backup"
-                        >
-                          <FileCheck size={14} />
-                          <span>Restaurar</span>
-                        </button>
-                      </div>
+                      {Object.entries(months).map(([month, days]) => (
+                        <div key={month} className="pl-4 space-y-3 border-l-2 border-indigo-200">
+                          <div className="flex items-center gap-2 font-extrabold text-xs text-indigo-900 uppercase">
+                            <Calendar size={15} className="text-indigo-600" />
+                            <span>Mês: {month}</span>
+                          </div>
+
+                          {Object.entries(days).map(([dayKey, backupsListUnknown]) => {
+                            const backupsList = backupsListUnknown as SystemBackupRecord[];
+                            return (
+                            <div key={dayKey} className="pl-4 space-y-2">
+                              <div className="bg-[#121c60]/5 border border-[#121c60]/20 px-3.5 py-2 rounded-xl font-bold text-xs text-[#121c60] flex items-center justify-between shadow-2xs">
+                                <span className="flex items-center gap-2">
+                                  <FolderOpen size={17} className="text-[#FFB800]" />
+                                  <span>Pasta de Backup (Dia. Mês. Ano): {dayKey}</span>
+                                </span>
+                                <span className="bg-[#121c60] text-white px-2 py-0.5 rounded-full text-[10px] font-black">
+                                  {backupsList.length} {backupsList.length === 1 ? 'registo' : 'registos'}
+                                </span>
+                              </div>
+
+                              <div className="space-y-2 pl-2">
+                                {backupsList.map((b) => (
+                                  <div
+                                    key={b.id}
+                                    className="p-3.5 bg-white border border-gray-200 rounded-xl shadow-2xs hover:border-indigo-400 transition-all flex flex-col sm:flex-row sm:items-center justify-between gap-3"
+                                  >
+                                    <div className="space-y-1">
+                                      <div className="flex items-center gap-2">
+                                        <span className="font-black text-xs text-[#121c60]">
+                                          Hora: {b.formattedDate}
+                                        </span>
+                                        <span
+                                          className={`px-2 py-0.5 rounded-full text-[9px] font-black uppercase ${
+                                            b.type === "manual"
+                                              ? "bg-purple-100 text-purple-800"
+                                              : "bg-blue-100 text-blue-800"
+                                          }`}
+                                        >
+                                          {b.type === "manual" ? "Manual" : "Automático"}
+                                        </span>
+                                        <span className="bg-gray-100 text-gray-700 px-1.5 py-0.5 rounded text-[9px] font-bold">
+                                          {b.totalSizeKB} KB
+                                        </span>
+                                      </div>
+                                      <div className="text-[11px] text-gray-600 flex items-center gap-2">
+                                        <span className="font-bold text-emerald-700">
+                                          {b.totalRecords} registos totais
+                                        </span>
+                                        <span>•</span>
+                                        <span>4 Órgãos preservados</span>
+                                      </div>
+                                    </div>
+
+                                    <div className="flex items-center gap-2 shrink-0">
+                                      <button
+                                        onClick={() => downloadStoredBackupFile(b)}
+                                        className="bg-indigo-50 hover:bg-indigo-100 text-[#121c60] font-bold text-xs px-2.5 py-1.5 rounded-lg border border-indigo-200 flex items-center gap-1 transition-all"
+                                        title="Descarregar ficheiro JSON deste backup"
+                                      >
+                                        <Download size={13} />
+                                        <span>Baixar JSON</span>
+                                      </button>
+                                      <button
+                                        onClick={() => handleRestoreFromStored(b)}
+                                        disabled={loading}
+                                        className="bg-emerald-700 hover:bg-emerald-800 text-white font-bold text-xs px-2.5 py-1.5 rounded-lg flex items-center gap-1 transition-all disabled:opacity-50 shadow-2xs"
+                                        title="Restaurar a base de dados a partir deste backup"
+                                      >
+                                        <FileCheck size={13} />
+                                        <span>Restaurar</span>
+                                      </button>
+                                      <button
+                                        onClick={() => handleDeleteStoredBackup(b)}
+                                        disabled={loading}
+                                        className="bg-red-50 hover:bg-red-100 text-red-600 font-bold text-xs px-2.5 py-1.5 rounded-lg border border-red-200 flex items-center gap-1 transition-all disabled:opacity-50"
+                                        title="Excluir permanentemente este backup"
+                                      >
+                                        <Trash2 size={13} />
+                                        <span>Excluir</span>
+                                      </button>
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+                             </div>
+                            );
+                          })}
+                        </div>
+                      ))}
                     </div>
                   ))}
                 </div>
